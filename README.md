@@ -86,6 +86,12 @@ opencode-remote-platform/
   docs/reference/cli.md
 ```
 
+## 管理界面双运行时
+
+项目正在扩展为“同一套 React 管理界面 + 两个薄运行时外壳”：服务器 Web 通过 HTTP ManagementClient 调用服务器 API，Tauri 桌面端通过 invoke bridge 调用本机能力。服务器侧提供 FRP 服务端、Caddy、公共 endpoint 和显式 OpenCode 操作；桌面侧提供 FRP 客户端、本机 OpenCode 检测和本机配置管理。
+
+服务器部署默认不安装 OpenCode，也不会默认启动 OpenCode。OpenCode、`oh-my-openagent` 插件和公网 endpoint 必须通过 UI/CLI 中的显式动作启用。完整说明见 `docs/guide/management-ui.md`。
+
 ## 共享核心架构
 
 项目边界冻结为“共享核心 + 两个薄外壳”：

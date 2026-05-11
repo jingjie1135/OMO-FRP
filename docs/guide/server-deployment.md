@@ -7,6 +7,8 @@
 - Caddy 负责终止 HTTPS，并在代理到 OpenCode 前强制执行 Basic Auth。
 - frp-panel 通过 Docker Compose 运行，并为桌面端暴露 API/RPC 地址。
 
+服务器 Web 管理端会复用同一套 React 管理界面；桌面应用则通过 Tauri 桌面端接入同一套页面。FRP 页面在服务器中显示 FRP 服务端管理，在桌面中显示 FRP 客户端配置。
+
 ## 文件
 
 - `deploy/server/.env.example`：环境变量和密钥模板。

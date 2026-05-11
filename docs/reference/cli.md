@@ -2,6 +2,8 @@
 
 `opencode-remote` 是 OpenCode 远程平台的命令入口。`oh-my-openagent` 不是本项目的 CLI；它只会作为 OpenCode 插件出现在特定安装/配置流程中。
 
+CLI 与管理界面共享 core 模型。服务器 Web 和 Tauri 桌面端会复用同一套 React 管理界面；CLI 继续提供自动化入口，用于生成部署计划、frpc 配置和 Cloudflare Tunnel 引导。
+
 ## 命令
 
 | 命令 | 说明 |
