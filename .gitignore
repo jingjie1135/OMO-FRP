@@ -1,0 +1,27 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+build/
+coverage/
+
+# Runtime/generated files
+*.log
+*.tmp
+*.local
+.env
+.env.*
+!.env.example
+!.env.local
+
+# Tool caches
+.bun/
+.turbo/
+.cache/
+
+# OS/editor files
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/

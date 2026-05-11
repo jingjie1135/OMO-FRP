@@ -1,0 +1,26 @@
+{
+  "name": "opencode-remote-platform",
+  "version": "0.1.0",
+  "description": "Independent OpenCode remote install and access platform with oh-my-openagent as an optional OpenCode plugin dependency.",
+  "type": "module",
+  "bin": {
+    "opencode-remote": "bin/opencode-remote.js",
+    "opencode-remote-platform": "bin/opencode-remote.js"
+  },
+  "scripts": {
+    "cli": "bun run src/cli-program.ts",
+    "smoke": "bun run src/cli-program.ts smoke",
+    "test": "bun test src/cli/install-config.test.ts src/cli/remote-access/remote-access.test.ts src/cli/cloudflare-tunnel/plan.test.ts"
+  },
+  "keywords": [
+    "opencode",
+    "remote-access",
+    "frp-panel",
+    "cloudflare-tunnel"
+  ],
+  "license": "UNLICENSED",
+  "devDependencies": {
+    "bun-types": "^1.3.11",
+    "typescript": "^5.7.3"
+  }
+}
