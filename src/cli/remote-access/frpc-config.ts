@@ -15,7 +15,7 @@ export function generateFrpcConfig(input: FrpcConfigInput): string {
     `[[proxies]]`,
     `name = ${quoteTomlString(input.proxyName)}`,
     `type = ${quoteTomlString(input.proxyType)}`,
-    `localIP = "127.0.0.1"`,
+    `localIP = ${quoteTomlString(input.localHost ?? "127.0.0.1")}`,
     `localPort = ${input.localPort}`,
   ]
 

@@ -51,6 +51,7 @@ export interface FrpcConfigInput {
   transport: FrpTransport
   proxyType: FrpProxyType
   proxyName: string
+  localHost?: string
   localPort: number
   remotePort?: number
   subdomain?: string
