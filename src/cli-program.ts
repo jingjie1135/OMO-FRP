@@ -109,10 +109,13 @@ function serverDeployPlan(args: string[]): number {
   console.log(`OpenCode URL: ${plan.opencodePublicUrl}`)
   console.log(`frp-panel API URL: ${plan.frpPanelApiUrl}`)
   console.log(`frp-panel RPC URL: ${plan.frpPanelRpcUrl}`)
+  console.log(`Manages OpenCode by default: ${plan.managesOpenCodeByDefault ? "yes" : "no"}`)
   console.log("Required secrets:")
   for (const secret of plan.requiredSecrets) console.log(`  - ${secret}`)
-  console.log("Commands:")
+  console.log("Server commands:")
   for (const command of plan.commands) console.log(`  ${command}`)
+  console.log("Explicit OpenCode actions:")
+  for (const action of plan.explicitToolActions) console.log(`  ${action.id}: ${action.command}`)
   return 0
 }
 

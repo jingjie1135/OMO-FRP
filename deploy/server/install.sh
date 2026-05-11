@@ -32,19 +32,13 @@ set -a
 source "$ENV_FILE"
 set +a
 
-: "${OPENCODE_SERVER_PASSWORD:?set OPENCODE_SERVER_PASSWORD in $ENV_FILE}"
 : "${OPENCODE_REMOTE_BASIC_AUTH_PASSWORD_HASH:?set OPENCODE_REMOTE_BASIC_AUTH_PASSWORD_HASH in $ENV_FILE}"
 : "${FRP_PANEL_APP_GLOBAL_SECRET:?set FRP_PANEL_APP_GLOBAL_SECRET in $ENV_FILE}"
 
-OPENCODE_CONFIG_DIR="${OPENCODE_CONFIG_DIR:-$ROOT/opencode}" opencode-remote detect --remote --port "${OPENCODE_PORT:-4096}"
-OPENCODE_CONFIG_DIR="${OPENCODE_CONFIG_DIR:-$ROOT/opencode}" bunx oh-my-openagent install --no-tui --claude=max20 --openai=no --gemini=no --copilot=no --skip-auth
-chown -R "$SERVICE_USER:$SERVICE_USER" "$OPENCODE_CONFIG_DIR"
-
-systemctl daemon-reload
-systemctl enable --now opencode-remote.service
 docker compose --env-file "$ENV_FILE" -f "$ROOT/docker-compose.yml" up -d frp-panel caddy
 "$ROOT/healthcheck.sh"
 
 printf 'OpenCode URL: %s\n' "${OPENCODE_REMOTE_PUBLIC_URL:-https://${OPENCODE_REMOTE_DOMAIN}}"
 printf 'frp-panel API URL: %s\n' "${FRP_PANEL_CLIENT_API_URL}"
 printf 'frp-panel RPC URL: %s\n' "${FRP_PANEL_CLIENT_RPC_URL}"
+printf 'OpenCode is not installed or started by this server bootstrap. Use opencode-remote detect/start and bunx oh-my-openagent install as explicit follow-up actions.\n'
