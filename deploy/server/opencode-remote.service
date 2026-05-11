@@ -1,0 +1,22 @@
+[Unit]
+Description=OpenCode Remote Platform server
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=opencode-remote
+Group=opencode-remote
+EnvironmentFile=/opt/opencode-remote-platform/.env
+WorkingDirectory=/srv/opencode-remote/workspaces
+ExecStart=/usr/bin/env sh -lc 'opencode serve --hostname "$OPENCODE_HOST" --port "$OPENCODE_PORT"'
+Restart=on-failure
+RestartSec=5
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=full
+ProtectHome=read-only
+ReadWritePaths=/opt/opencode-remote-platform /srv/opencode-remote/workspaces
+
+[Install]
+WantedBy=multi-user.target

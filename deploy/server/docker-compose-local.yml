@@ -1,0 +1,79 @@
+services:
+  opencode:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    environment:
+      OPENCODE_HOST: "0.0.0.0"
+      OPENCODE_PORT: "${OPENCODE_PORT:-4096}"
+      OPENCODE_SERVER_PASSWORD: "${OPENCODE_SERVER_PASSWORD:?set OPENCODE_SERVER_PASSWORD}"
+      OPENCODE_CONFIG_DIR: "/config"
+    volumes:
+      - opencode-config:/config
+      - opencode-workspaces:/workspaces
+    networks:
+      - internal
+    healthcheck:
+      test: ["CMD-SHELL", "node -e \"require('net').connect(${OPENCODE_PORT:-4096},'127.0.0.1',()=>{process.exit(0)}).on('error',()=>{process.exit(1)})\""]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+
+  frp-panel:
+    image: ${FRP_PANEL_IMAGE:-vaalacat/frp-panel:latest}
+    restart: unless-stopped
+    environment:
+      APP_GLOBAL_SECRET: "${FRP_PANEL_APP_GLOBAL_SECRET:?set FRP_PANEL_APP_GLOBAL_SECRET}"
+      DB_DSN: "${FRP_PANEL_DB_DSN:-/data/data.db?_pragma=journal_mode(WAL)}"
+      MASTER_API_HOST: "0.0.0.0"
+      MASTER_API_PORT: "${FRP_PANEL_API_PORT:-9000}"
+      MASTER_RPC_HOST: "0.0.0.0"
+      MASTER_RPC_PORT: "${FRP_PANEL_RPC_PORT:-9001}"
+      CLIENT_API_URL: "http://localhost:${FRP_PANEL_API_PORT:-9000}"
+      CLIENT_RPC_URL: "ws://localhost:${FRP_PANEL_RPC_PORT:-9001}/rpc"
+      CLIENT_TLS_INSECURE_SKIP_VERIFY: "${FRP_PANEL_CLIENT_TLS_INSECURE_SKIP_VERIFY:-false}"
+    ports:
+      - "${FRP_PANEL_API_PORT:-9000}:${FRP_PANEL_API_PORT:-9000}"
+      - "${FRP_PANEL_RPC_PORT:-9001}:${FRP_PANEL_RPC_PORT:-9001}"
+    volumes:
+      - frp-panel-data:/data
+    networks:
+      - internal
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:${FRP_PANEL_API_PORT:-9000} >/dev/null || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+
+  caddy:
+    image: caddy:2
+    restart: unless-stopped
+    env_file:
+      - .env.local
+    ports:
+      - "8880:8880"
+      - "9080:9080"
+    volumes:
+      - ./Caddyfile.local:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    networks:
+      - internal
+    depends_on:
+      opencode:
+        condition: service_healthy
+      frp-panel:
+        condition: service_healthy
+
+networks:
+  internal:
+    driver: bridge
+
+volumes:
+  opencode-config:
+  opencode-workspaces:
+  frp-panel-data:
+  caddy-data:
+  caddy-config:

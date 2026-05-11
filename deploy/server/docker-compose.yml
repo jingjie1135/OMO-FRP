@@ -1,0 +1,40 @@
+services:
+  frp-panel:
+    image: ${FRP_PANEL_IMAGE:-vaalacat/frp-panel:latest}
+    restart: unless-stopped
+    environment:
+      APP_GLOBAL_SECRET: ${FRP_PANEL_APP_GLOBAL_SECRET:?set FRP_PANEL_APP_GLOBAL_SECRET}
+      DB_DSN: ${FRP_PANEL_DB_DSN:-/data/data.db?_pragma=journal_mode(WAL)}
+      MASTER_API_HOST: 127.0.0.1
+      MASTER_API_PORT: ${FRP_PANEL_API_PORT:-9000}
+      MASTER_RPC_HOST: 127.0.0.1
+      MASTER_RPC_PORT: ${FRP_PANEL_RPC_PORT:-9001}
+      CLIENT_API_URL: ${FRP_PANEL_CLIENT_API_URL:?set FRP_PANEL_CLIENT_API_URL}
+      CLIENT_RPC_URL: ${FRP_PANEL_CLIENT_RPC_URL:?set FRP_PANEL_CLIENT_RPC_URL}
+      CLIENT_TLS_INSECURE_SKIP_VERIFY: ${FRP_PANEL_CLIENT_TLS_INSECURE_SKIP_VERIFY:-false}
+    volumes:
+      - frp-panel-data:/data
+    network_mode: host
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:${FRP_PANEL_API_PORT:-9000} >/dev/null || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+
+  caddy:
+    image: caddy:2
+    restart: unless-stopped
+    env_file:
+      - .env
+    network_mode: host
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    depends_on:
+      - frp-panel
+
+volumes:
+  frp-panel-data:
+  caddy-data:
+  caddy-config:
