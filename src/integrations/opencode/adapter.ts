@@ -1,6 +1,7 @@
 import { createCommandSpec } from "../../core/executor"
 import type { Plan } from "../../core/planner"
 import type { OperationRun, PublicRoute, ToolInstance } from "../../core/schema"
+import { buildOpenCodeStartCommand } from "../../core/opencode/opencode-adapter"
 
 export const OPENCODE_ADAPTER_KIND = "opencode" as const
 
@@ -25,12 +26,14 @@ export function createOpenCodeTool(options: {
 }
 
 export function planOpenCodeStart(tool: ToolInstance, port: number): Plan<OperationRun> {
+  const startCommand = buildOpenCodeStartCommand({ executable: tool.executable, port })
+
   return {
     id: `${tool.id}:start`,
     title: "Start OpenCode locally",
     targetId: tool.id,
     output: { action: "start", targetId: tool.id, status: "planned", redactedLogPath: `logs/${tool.id}-start.log` },
-    commands: [createCommandSpec("opencode", tool.executable, ["serve", "--hostname", "127.0.0.1", "--port", String(port)])],
+    commands: [createCommandSpec("opencode", startCommand.command[0] ?? tool.executable, startCommand.command.slice(1))],
     issues: tool.auth.passwordRef ? [] : [{ code: "tool-password-missing", message: `Tool '${tool.id}' requires OPENCODE_SERVER_PASSWORD before exposure.`, path: `tools.${tool.id}.auth.passwordRef`, severity: "error" }],
   }
 }
