@@ -1,18 +1,18 @@
-# CLI Reference
+# CLI 参考
 
-`opencode-remote` is the command surface for OpenCode Remote Platform. `oh-my-openagent` is not this project's CLI; it appears only as an OpenCode plugin installed/configured by specific workflows.
+`opencode-remote` 是 OpenCode 远程平台的命令入口。`oh-my-openagent` 不是本项目的 CLI；它只会作为 OpenCode 插件出现在特定安装/配置流程中。
 
-## Commands
+## 命令
 
-| Command | Description |
+| 命令 | 说明 |
 | --- | --- |
-| `detect` | Check OpenCode, Bun, Docker/Compose, plugin config, password, and port readiness |
-| `start` | Print a password-aware local OpenCode server command |
-| `server-deploy-plan` | Print server deployment paths, URLs, secrets, and command sequence |
-| `remote-access` | Generate frp-panel routing config and optionally start OpenCode/frpc |
-| `cloudflare-tunnel` | Generate Cloudflare Tunnel setup steps for local OpenCode |
-| `smoke` | Run a local smoke validation over migrated planners |
-| `version` | Show package version |
+| `detect` | 检查 OpenCode、Bun、Docker/Compose、插件配置、密码和端口就绪状态 |
+| `start` | 输出带密码保护意识的本地 OpenCode 服务器启动命令 |
+| `server-deploy-plan` | 输出服务器部署路径、地址、密钥和命令序列 |
+| `remote-access` | 生成 frp-panel 路由配置，并可选择启动 OpenCode/frpc |
+| `cloudflare-tunnel` | 为本地 OpenCode 生成 Cloudflare Tunnel 配置步骤 |
+| `smoke` | 对迁移后的规划器运行本地 smoke 验证 |
+| `version` | 显示包版本 |
 
 ## detect
 
@@ -21,7 +21,7 @@ opencode-remote detect --remote --port 4096
 opencode-remote detect --json
 ```
 
-Remote mode warns when `OPENCODE_SERVER_PASSWORD` is missing. The plugin config check looks for `oh-my-openagent.json` / `oh-my-openagent.jsonc` inside the OpenCode config directory because the plugin remains a dependency.
+远程模式会在缺少 `OPENCODE_SERVER_PASSWORD` 时给出警告。插件配置检查会在 OpenCode 配置目录中查找 `oh-my-openagent.json` / `oh-my-openagent.jsonc`，因为该插件仍是平台流程中的依赖。
 
 ## start
 
@@ -30,7 +30,7 @@ opencode-remote start --port 4096
 OPENCODE_SERVER_PASSWORD=secret opencode-remote start --remote --public-url https://opencode.example.com
 ```
 
-Use `--no-generate-password` when automation should fail on a missing password instead of generating one.
+当自动化流程需要在缺少密码时直接失败，而不是自动生成密码时，请使用 `--no-generate-password`。
 
 ## server-deploy-plan
 
@@ -39,7 +39,7 @@ opencode-remote server-deploy-plan --domain opencode.example.com --email admin@e
 opencode-remote server-deploy-plan --domain opencode.example.com --email admin@example.com --json
 ```
 
-The plan includes `/opt/opencode-remote-platform` paths, required secret names, the OpenCode public URL, frp-panel API/RPC URLs, `opencode-remote detect/start` commands, and the plugin install substep using `bunx oh-my-openagent install --no-tui`.
+该规划会包含 `/opt/opencode-remote-platform` 路径、必需密钥名称、OpenCode 公网地址、frp-panel API/RPC 地址和服务器命令。服务器命令默认只部署 FRP server、公共路由和受保护入口；OpenCode 检测、`oh-my-openagent` 插件安装和 OpenCode 启动会以 `explicitToolActions` 单独输出，必须由 UI/CLI 显式触发。
 
 ## remote-access
 
@@ -52,30 +52,30 @@ opencode-remote remote-access \
   --output-config ./frpc.toml
 ```
 
-Options:
+选项：
 
-| Option | Description |
+| 选项 | 说明 |
 | --- | --- |
-| `--panel-url <url>` | frp-panel public URL |
-| `--auth-token <token>` | frp token for the server or panel |
-| `--password <password>` | Strong OpenCode Basic Auth password; defaults to `OPENCODE_SERVER_PASSWORD` |
-| `--username <username>` | OpenCode Basic Auth username; defaults to `OPENCODE_SERVER_USERNAME` or `opencode` |
-| `--proxy-name <name>` | frp proxy name |
-| `--server-addr <host>` | frp server address; defaults to the panel hostname |
-| `--server-port <port>` | frp server bind port; defaults to `7000` |
-| `--transport <protocol>` | `tcp`, `kcp`, `websocket`, or `quic` |
-| `--local-port <port>` | local OpenCode server port; defaults to `4096` |
-| `--remote-port <port>` | TCP/port-based public routing |
-| `--subdomain <name>` | HTTP subdomain for frp public routing |
-| `--custom-domain <domain>` | HTTP custom domain for frp public routing |
-| `--http` | show an `http` public URL instead of `https` |
-| `--output-config <path>` | write generated frpc TOML to a file |
-| `--frpc-bin <path>` | frpc binary path; defaults to `frpc` |
-| `--no-start` | do not start OpenCode; only generate config and diagnostics |
-| `--no-frpc` | do not start frpc; only print/write generated config |
-| `--json` | output structured JSON |
+| `--panel-url <url>` | frp-panel 公网地址 |
+| `--auth-token <token>` | 服务器或面板使用的 frp token |
+| `--password <password>` | OpenCode Basic Auth 强密码；默认读取 `OPENCODE_SERVER_PASSWORD` |
+| `--username <username>` | OpenCode Basic Auth 用户名；默认读取 `OPENCODE_SERVER_USERNAME`，未设置时使用 `opencode` |
+| `--proxy-name <name>` | frp 代理名称 |
+| `--server-addr <host>` | frp 服务器地址；默认使用面板主机名 |
+| `--server-port <port>` | frp 服务器绑定端口；默认值为 `7000` |
+| `--transport <protocol>` | 可选 `tcp`、`kcp`、`websocket` 或 `quic` |
+| `--local-port <port>` | 本地 OpenCode 服务器端口；默认值为 `4096` |
+| `--remote-port <port>` | 基于 TCP/端口的公网路由 |
+| `--subdomain <name>` | frp HTTP 公网路由使用的子域名 |
+| `--custom-domain <domain>` | frp HTTP 公网路由使用的自定义域名 |
+| `--http` | 显示 `http` 公网地址，而不是 `https` |
+| `--output-config <path>` | 将生成的 frpc TOML 写入文件 |
+| `--frpc-bin <path>` | frpc 二进制路径；默认值为 `frpc` |
+| `--no-start` | 不启动 OpenCode，只生成配置和诊断信息 |
+| `--no-frpc` | 不启动 frpc，只打印或写入生成的配置 |
+| `--json` | 输出结构化 JSON |
 
-Use `--subdomain` or `--custom-domain` for frp HTTP routing. Use `--remote-port` for TCP/port routing.
+frp HTTP 路由请使用 `--subdomain` 或 `--custom-domain`；TCP/端口路由请使用 `--remote-port`。
 
 ## cloudflare-tunnel
 
@@ -85,8 +85,8 @@ opencode-remote cloudflare-tunnel --mode named --hostname opencode.example.com -
 opencode-remote cloudflare-tunnel --json
 ```
 
-The command only prints local OpenCode and `cloudflared` steps. It does not start a public tunnel.
+该命令只会打印本地 OpenCode 和 `cloudflared` 的操作步骤，不会直接启动公网隧道。
 
-## Exit codes
+## 退出码
 
-Commands return `0` on success and `1` on validation or diagnostic failure.
+命令成功时返回 `0`；校验或诊断失败时返回 `1`。
