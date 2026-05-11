@@ -79,11 +79,15 @@ describe("install-config server deploy plan", () => {
     expect(plan.opencodePublicUrl).toBe("https://openremote.example.com")
     expect(plan.frpPanelApiUrl).toBe("https://frp.openremote.example.com")
     expect(plan.frpPanelRpcUrl).toBe("wss://frp.openremote.example.com/rpc")
-    expect(plan.requiredSecrets).toContain("OPENCODE_SERVER_PASSWORD")
+    expect(plan.managesOpenCodeByDefault).toBe(false)
+    expect(plan.requiredSecrets).not.toContain("OPENCODE_SERVER_PASSWORD")
     expect(plan.requiredSecrets).toContain("FRP_PANEL_APP_GLOBAL_SECRET")
     expect(plan.requiredSecrets).toContain("OPENCODE_REMOTE_BASIC_AUTH_PASSWORD_HASH")
-    expect(plan.commands.join("\n")).toContain("opencode-remote detect --remote --port 4099")
-    expect(plan.commands.join("\n")).toContain("bunx oh-my-openagent install --no-tui")
+    expect(plan.commands.join("\n")).not.toContain("opencode-remote detect --remote --port 4099")
+    expect(plan.commands.join("\n")).not.toContain("bunx oh-my-openagent install --no-tui")
+    expect(plan.explicitToolActions.map((action) => action.id)).toEqual(["detect-opencode", "install-oh-my-openagent-plugin", "start-opencode"])
+    expect(plan.explicitToolActions.map((action) => action.command).join("\n")).toContain("opencode-remote detect --remote --port 4099")
+    expect(plan.explicitToolActions.map((action) => action.command).join("\n")).toContain("bunx oh-my-openagent install --no-tui")
   })
 
   it("requires a domain and email", () => {

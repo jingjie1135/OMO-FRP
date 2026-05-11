@@ -192,8 +192,8 @@ export function buildServerDeployPlan(options: Partial<ServerDeployOptions>): Se
     frpPanelApiUrl,
     frpPanelRpcUrl,
     frpPanelImage,
+    managesOpenCodeByDefault: false,
     requiredSecrets: [
-      "OPENCODE_SERVER_PASSWORD",
       "OPENCODE_REMOTE_BASIC_AUTH_PASSWORD_HASH",
       "FRP_PANEL_APP_GLOBAL_SECRET",
     ],
@@ -201,14 +201,25 @@ export function buildServerDeployPlan(options: Partial<ServerDeployOptions>): Se
       `install -d -m 0750 ${installRoot}`,
       `cp .env.example ${installRoot}/.env`,
       `cp docker-compose.yml Caddyfile healthcheck.sh ${installRoot}/`,
-      `cp opencode-remote.service /etc/systemd/system/opencode-remote.service`,
-      `OPENCODE_CONFIG_DIR=${installRoot}/opencode opencode-remote detect --remote --port ${opencodePort}`,
-      `OPENCODE_CONFIG_DIR=${installRoot}/opencode bunx oh-my-openagent install --no-tui --claude=max20 --openai=no --gemini=no --copilot=no --skip-auth`,
-      `opencode-remote start --remote --port ${opencodePort} --public-url ${opencodePublicUrl}`,
       `docker compose --env-file ${installRoot}/.env -f ${installRoot}/docker-compose.yml up -d frp-panel caddy`,
-      "systemctl daemon-reload",
-      "systemctl enable --now opencode-remote.service",
       `${installRoot}/healthcheck.sh`,
+    ],
+    explicitToolActions: [
+      {
+        id: "detect-opencode",
+        description: "Detect OpenCode and password readiness before exposing it.",
+        command: `OPENCODE_CONFIG_DIR=${installRoot}/opencode opencode-remote detect --remote --port ${opencodePort}`,
+      },
+      {
+        id: "install-oh-my-openagent-plugin",
+        description: "Install oh-my-openagent as an explicit OpenCode plugin step.",
+        command: `OPENCODE_CONFIG_DIR=${installRoot}/opencode bunx oh-my-openagent install --no-tui --claude=max20 --openai=no --gemini=no --copilot=no --skip-auth`,
+      },
+      {
+        id: "start-opencode",
+        description: "Start OpenCode only after a password and route checks are confirmed.",
+        command: `opencode-remote start --remote --port ${opencodePort} --public-url ${opencodePublicUrl}`,
+      },
     ],
   }
 }

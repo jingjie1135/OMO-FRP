@@ -57,6 +57,12 @@ export interface ServerDeployOptions {
   publicUrl?: string
 }
 
+export interface ExplicitToolAction {
+  id: string
+  description: string
+  command: string
+}
+
 export interface ServerDeployPlan {
   installRoot: string
   envPath: string
@@ -68,6 +74,8 @@ export interface ServerDeployPlan {
   frpPanelApiUrl: string
   frpPanelRpcUrl: string
   frpPanelImage: string
+  managesOpenCodeByDefault: boolean
   requiredSecrets: string[]
   commands: string[]
+  explicitToolActions: ExplicitToolAction[]
 }
