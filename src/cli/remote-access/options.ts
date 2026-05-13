@@ -5,19 +5,38 @@ import { assertStrongPassword } from "./password"
 const DEFAULT_FRP_SERVER_PORT = 7000
 const FRP_TRANSPORTS = new Set<FrpTransport>(["tcp", "kcp", "websocket", "quic"])
 
-function normalizePanelUrl(value: string): string {
+function normalizeHttpUrl(name: string, value: string): string {
   try {
     const url = new URL(value)
     if (url.protocol !== "http:" && url.protocol !== "https:") {
-      throw new Error("frp-panel URL must use http or https")
+      throw new Error(`${name} must use http or https`)
     }
     return url.toString().replace(/\/$/, "")
   } catch (error) {
-    if (error instanceof Error && error.message === "frp-panel URL must use http or https") {
+    if (error instanceof Error && error.message === `${name} must use http or https`) {
       throw error
     }
-    throw new Error("frp-panel URL must be a valid URL")
+    throw new Error(`${name} must be a valid URL`)
   }
+}
+
+function normalizeRpcUrl(value: string): string {
+  try {
+    const url = new URL(value)
+    if (url.protocol !== "ws:" && url.protocol !== "wss:" && url.protocol !== "grpc:") {
+      throw new Error("frp-panel RPC URL must use ws, wss, or grpc")
+    }
+    return url.toString().replace(/\/$/, "")
+  } catch (error) {
+    if (error instanceof Error && error.message === "frp-panel RPC URL must use ws, wss, or grpc") {
+      throw error
+    }
+    throw new Error("frp-panel RPC URL must be a valid URL")
+  }
+}
+
+function normalizePanelUrl(value: string): string {
+  return normalizeHttpUrl("frp-panel URL", value)
 }
 
 function validatePort(name: string, value: number): number {
@@ -39,13 +58,34 @@ function deriveServerAddr(panelUrl: string): string {
   return new URL(panelUrl).hostname
 }
 
+function deriveClientId(): string {
+  const user = process.env.USER ?? process.env.USERNAME ?? "desktop"
+  return user.toLowerCase().replace(/[^a-z0-9_-]/g, "-").replace(/-+/g, "-")
+}
+
 function deriveProxyName(): string {
   const user = process.env.USER ?? process.env.USERNAME ?? "desktop"
   return `opencode-${user}`.toLowerCase().replace(/[^a-z0-9_-]/g, "-").replace(/-+/g, "-")
 }
 
+function derivePanelApiUrl(panelUrl: string, explicitApiUrl?: string): string {
+  return explicitApiUrl ? normalizeHttpUrl("frp-panel API URL", explicitApiUrl) : panelUrl
+}
+
+function derivePanelRpcUrl(panelApiUrl: string, explicitRpcUrl?: string): string {
+  if (explicitRpcUrl) {
+    return normalizeRpcUrl(explicitRpcUrl)
+  }
+
+  const apiUrl = new URL(panelApiUrl)
+  const protocol = apiUrl.protocol === "https:" ? "wss:" : "ws:"
+  return `${protocol}//${apiUrl.host}/rpc`
+}
+
 export function normalizeRemoteAccessOptions(options: RemoteAccessOptions): NormalizedRemoteAccessOptions {
   const panelUrl = normalizePanelUrl(options.panelUrl)
+  const panelApiUrl = derivePanelApiUrl(panelUrl, options.panelApiUrl)
+  const panelRpcUrl = derivePanelRpcUrl(panelApiUrl, options.panelRpcUrl)
   const password = options.password ?? process.env.OPENCODE_SERVER_PASSWORD
 
   if (!password) {
@@ -55,7 +95,7 @@ export function normalizeRemoteAccessOptions(options: RemoteAccessOptions): Norm
   assertStrongPassword(password)
 
   if (!options.authToken) {
-    throw new Error("frp auth token is required")
+    throw new Error("frp-panel auth token is required")
   }
 
   if (options.remotePort !== undefined && (options.subdomain || options.customDomain)) {
@@ -66,8 +106,14 @@ export function normalizeRemoteAccessOptions(options: RemoteAccessOptions): Norm
 
   return {
     panelUrl,
+    panelApiUrl,
+    panelRpcUrl,
     authToken: options.authToken,
+    serverId: options.serverId,
+    clientId: options.clientId ?? deriveClientId(),
+    clientSecret: options.clientSecret,
     proxyName: options.proxyName ?? deriveProxyName(),
+    frpBinary: options.frpBinary ?? (process.platform === "win32" ? "frp-panel.exe" : "frp-panel"),
     serverAddr: options.serverAddr ?? deriveServerAddr(panelUrl),
     serverPort: validatePort("server port", options.serverPort ?? DEFAULT_FRP_SERVER_PORT),
     transport: normalizeTransport(options.transport),
