@@ -40,7 +40,7 @@ export const DESKTOP_CAPABILITIES: RuntimeCapabilities = {
   canManageLocalProcesses: true,
 }
 
-export type ToolKind = Extract<CoreToolKind, "opencode"> | "future-tool"
+export type ToolKind = Extract<CoreToolKind, "opencode"> | "frpc" | "cloudflared" | "future-tool"
 export type ToolHostType = "server" | "desktop"
 export type ToolInstallState = "missing" | "detected" | "installed" | "configured"
 export type ToolRuntimeStatus = "stopped" | "starting" | "running" | "error"
@@ -57,6 +57,10 @@ export interface ToolInstance {
   defaultPort: number
   currentPort?: number
   status: ToolRuntimeStatus
+  pid?: number
+  logPath?: string
+  lastExitCode?: number
+  lastError?: string
 }
 
 export interface ConfigPreset {

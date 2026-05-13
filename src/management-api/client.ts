@@ -21,6 +21,7 @@ export interface ManagementClient {
   installTool(request: InstallToolRequest): Promise<JobResult>
   startTool(instanceId: string): Promise<JobResult>
   stopTool(instanceId: string): Promise<JobResult>
+  restartTool(instanceId: string): Promise<JobResult>
   getToolLogs(instanceId: string): Promise<LogLine[]>
 
   readConfig(target: ConfigTarget): Promise<ConfigDocument>
