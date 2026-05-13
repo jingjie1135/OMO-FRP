@@ -1,6 +1,6 @@
 # CLI 参考
 
-`opencode-remote` 是 OpenCode 远程平台的命令入口。`oh-my-openagent` 不是本项目的 CLI；它只会作为 OpenCode 插件出现在特定安装/配置流程中。
+`opencode-remote` / `opencode-remote-platform` 是 OpenCode 远程平台的命令入口。源码入口是 `src/cli-program.ts`，发布入口是 `bin/opencode-remote.js`。`oh-my-openagent` 不是本项目的 CLI；它只会作为 OpenCode 插件出现在特定安装/配置流程中。
 
 CLI 与管理界面共享 core 模型。服务器 Web 和 Tauri 桌面端会复用同一套 React 管理界面；CLI 继续提供自动化入口，用于生成部署计划、frpc 配置和 Cloudflare Tunnel 引导。
 
@@ -15,6 +15,18 @@ CLI 与管理界面共享 core 模型。服务器 Web 和 Tauri 桌面端会复�
 | `cloudflare-tunnel` | 为本地 OpenCode 生成 Cloudflare Tunnel 配置步骤 |
 | `smoke` | 对迁移后的规划器运行本地 smoke 验证 |
 | `version` | 显示包版本 |
+
+## 本地入口与验证命令
+
+```bash
+bun run cli -- help
+bun run smoke
+bun run typecheck
+bun run build
+node bin/opencode-remote.js version
+```
+
+这些基础验证命令均由 `package.json` scripts 或 `bin/opencode-remote.js` 覆盖；README 和测试说明不应再把平台 CLI 写成 `oh-my-openagent`。
 
 ## detect
 
@@ -59,10 +71,16 @@ opencode-remote remote-access \
 | 选项 | 说明 |
 | --- | --- |
 | `--panel-url <url>` | frp-panel 公网地址 |
+| `--panel-api-url <url>` | 显式覆盖 frp-panel API 地址 |
+| `--panel-rpc-url <url>` | 显式覆盖 frp-panel RPC 地址 |
 | `--auth-token <token>` | 服务器或面板使用的 frp token |
+| `--server-id <id>` | 多 server 场景下显式指定 frp-panel server |
+| `--client-id <id>` | 指定或复用 frp-panel client 标识 |
+| `--client-secret <secret>` | 预置 frp-panel restricted client secret |
 | `--password <password>` | OpenCode Basic Auth 强密码；默认读取 `OPENCODE_SERVER_PASSWORD` |
 | `--username <username>` | OpenCode Basic Auth 用户名；默认读取 `OPENCODE_SERVER_USERNAME`，未设置时使用 `opencode` |
 | `--proxy-name <name>` | frp 代理名称 |
+| `--frp-binary <path>` | frp-panel client 可执行文件路径 |
 | `--server-addr <host>` | frp 服务器地址；默认使用面板主机名 |
 | `--server-port <port>` | frp 服务器绑定端口；默认值为 `7000` |
 | `--transport <protocol>` | 可选 `tcp`、`kcp`、`websocket` 或 `quic` |
@@ -74,7 +92,7 @@ opencode-remote remote-access \
 | `--output-config <path>` | 将生成的 frpc TOML 写入文件 |
 | `--frpc-bin <path>` | frpc 二进制路径；默认值为 `frpc` |
 | `--no-start` | 不启动 OpenCode，只生成配置和诊断信息 |
-| `--no-frpc` | 不启动 frpc，只打印或写入生成的配置 |
+| `--no-frpc` | 不启动 frpc 或 frp-panel client，只打印或写入生成的配置 |
 | `--json` | 输出结构化 JSON |
 
 frp HTTP 路由请使用 `--subdomain` 或 `--custom-domain`；TCP/端口路由请使用 `--remote-port`。
@@ -92,3 +110,17 @@ opencode-remote cloudflare-tunnel --json
 ## 退出码
 
 命令成功时返回 `0`；校验或诊断失败时返回 `1`。
+
+## 工程质量门禁
+
+本地验证命令与 GitHub Actions CI 保持一致：
+
+```bash
+bun install
+bun test
+bun run typecheck
+bun run build
+bun run lint
+```
+
+`lint` 目前是 `typecheck` 的别名，用作不新增 lint 依赖的最小静态检查门禁。项目尚未建立 formatter 基线，因此暂不在 CI 中强制格式化检查。

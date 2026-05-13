@@ -10,7 +10,10 @@
   "scripts": {
     "cli": "bun run src/cli-program.ts",
     "smoke": "bun run src/cli-program.ts smoke",
-    "test": "bun test src/**/*.test.ts src/**/*.test.tsx"
+    "test": "bun test src/**/*.test.ts src/**/*.test.tsx",
+    "typecheck": "tsc --noEmit",
+    "build": "bun build src/cli-program.ts --outfile=dist/opencode-remote.js --target=bun",
+    "lint": "bun run typecheck"
   },
   "keywords": [
     "opencode",
