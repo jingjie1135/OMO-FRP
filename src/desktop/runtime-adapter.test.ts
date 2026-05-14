@@ -30,6 +30,7 @@ describe("desktop runtime adapter", () => {
 
     const adapter = createDesktopRuntimeAdapter({
       runtimeDir,
+      isPortAvailable: async () => true,
       env: {
         ...process.env,
         OPENCODE_SERVER_PASSWORD: "strong-password",
@@ -92,8 +93,8 @@ describe("desktop runtime adapter", () => {
 
   it("starts, restarts, stops, and logs managed desktop processes", async () => {
     const runtimeDir = mkdtempSync(join(tmpdir(), "omo-desktop-runtime-lifecycle-"))
-    const bunPath = Bun.which("bun")
-    expect(bunPath).toBeString()
+    const nodePath = Bun.which("node")
+    expect(nodePath).toBeString()
 
     const adapter = createDesktopRuntimeAdapter({
       runtimeDir,
@@ -106,13 +107,13 @@ describe("desktop runtime adapter", () => {
           id: "opencode-desktop",
           kind: "opencode",
           displayName: "OpenCode",
-          binaryNames: ["bun"],
+          binaryNames: ["node"],
           versionArgs: ["--version"],
-          resolveBinaryPath: () => bunPath!,
+          resolveBinaryPath: () => nodePath!,
           resolveConfigDirectory: () => runtimeDir,
           defaultPort: 4196,
           buildStartCommand: () => ({
-            command: [bunPath!, "-e", 'console.log("boot"); setInterval(() => console.log("tick"), 25)'],
+            command: [nodePath!, "-e", 'console.log("boot Authorization: Bearer session-secret token=client-secret password=Strong-password-123!"); setInterval(() => console.log("tick"), 25)'],
             currentPort: 4196,
             configDirectory: runtimeDir,
           }),
@@ -136,6 +137,8 @@ describe("desktop runtime adapter", () => {
 
     const logsAfterRestart = await adapter.getToolLogs("opencode-desktop")
     expect(logsAfterRestart.some((line) => line.message.includes("boot") || line.message.includes("tick"))).toBe(true)
+    expect(logsAfterRestart.some((line) => line.message.includes("session-secret") || line.message.includes("client-secret") || line.message.includes("Strong-password-123"))).toBe(false)
+    expect(logsAfterRestart.some((line) => line.message.includes("[REDACTED]"))).toBe(true)
 
     const stopResult = await adapter.stopTool("opencode-desktop")
     expect(stopResult.status).toBe("succeeded")
@@ -145,6 +148,68 @@ describe("desktop runtime adapter", () => {
     const stoppedTools = await adapter.listToolInstances()
     expect(stoppedTools[0]?.status).toBe("stopped")
     expect(stoppedTools[0]?.pid).toBeUndefined()
+  })
+
+  it("caches desktop detection metadata between tool instance reads", async () => {
+    const runtimeDir = mkdtempSync(join(tmpdir(), "omo-desktop-runtime-cache-"))
+    let resolveBinaryCalls = 0
+
+    const adapter = createDesktopRuntimeAdapter({
+      runtimeDir,
+      toolSpecs: [
+        {
+          id: "opencode-desktop",
+          kind: "opencode",
+          displayName: "OpenCode",
+          binaryNames: ["opencode"],
+          versionArgs: ["--version"],
+          resolveBinaryPath: () => {
+            resolveBinaryCalls++
+            return "C:/bin/opencode"
+          },
+          resolveConfigDirectory: () => runtimeDir,
+          defaultPort: 4096,
+          buildStartCommand: () => ({ command: ["C:/bin/opencode", "serve"], currentPort: 4096, configDirectory: runtimeDir }),
+        },
+      ],
+    })
+
+    await adapter.listToolInstances()
+    await adapter.listToolInstances()
+
+    expect(resolveBinaryCalls).toBe(1)
+  })
+
+  it("uses the configured port availability checker before starting OpenCode", async () => {
+    const runtimeDir = mkdtempSync(join(tmpdir(), "omo-desktop-runtime-port-checker-"))
+    const checkedPorts: number[] = []
+
+    const adapter = createDesktopRuntimeAdapter({
+      runtimeDir,
+      isPortAvailable: async (port) => {
+        checkedPorts.push(port)
+        return false
+      },
+      toolSpecs: [
+        {
+          id: "opencode-desktop",
+          kind: "opencode",
+          displayName: "OpenCode",
+          binaryNames: ["opencode"],
+          versionArgs: ["--version"],
+          resolveBinaryPath: () => "C:/bin/opencode",
+          resolveConfigDirectory: () => runtimeDir,
+          defaultPort: 4396,
+          buildStartCommand: () => ({ command: ["C:/bin/opencode", "serve"], currentPort: 4396, configDirectory: runtimeDir }),
+        },
+      ],
+    })
+
+    const result = await adapter.startTool("opencode-desktop")
+
+    expect(result.status).toBe("failed")
+    expect(result.message).toContain("端口冲突")
+    expect(checkedPorts).toEqual([4396])
   })
 
   it("reports a clear diagnostic when the managed OpenCode port is already occupied", async () => {

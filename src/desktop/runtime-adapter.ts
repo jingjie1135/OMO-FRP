@@ -17,6 +17,7 @@ import {
 import type { FrpStatus, JobResult, LogLine, ToolDetection } from "../management-api/types"
 import { CONFIG_BASENAME, LEGACY_CONFIG_BASENAME } from "../shared/plugin-identity"
 import { isPortAvailable } from "../shared/port-utils"
+import { redactSensitiveText } from "../shared/redact-sensitive-text"
 import { spawnSync } from "../shared/bun-spawn-shim"
 import { getOpenCodeConfigPaths } from "../shared/opencode-config-dir"
 
@@ -57,6 +58,8 @@ interface DesktopStartCommand {
 }
 
 interface ManagedToolState {
+  detected: boolean
+  versionDetected: boolean
   status: ToolInstance["status"]
   binaryPath?: string
   version?: string
@@ -90,6 +93,7 @@ export interface DesktopRuntimeAdapterOptions {
   env?: NodeJS.ProcessEnv
   runtimeDir?: string
   toolSpecs?: DesktopToolSpec[]
+  isPortAvailable?: (port: number) => Promise<boolean>
 }
 
 const DEFAULT_TOOL_SPECS: DesktopToolSpec[] = [
@@ -208,15 +212,19 @@ class DesktopRuntimeAdapterImpl implements DesktopRuntimeAdapter {
   private readonly env: NodeJS.ProcessEnv
   private readonly runtimeDir: string
   private readonly specs: DesktopToolSpec[]
+  private readonly isPortAvailable: (port: number) => Promise<boolean>
   private readonly states = new Map<string, ManagedToolState>()
 
   constructor(options: DesktopRuntimeAdapterOptions = {}) {
     this.env = options.env ?? process.env
     this.runtimeDir = options.runtimeDir ?? getDesktopRuntimeDir(this.env)
     this.specs = options.toolSpecs ?? DEFAULT_TOOL_SPECS
+    this.isPortAvailable = options.isPortAvailable ?? isPortAvailable
 
     for (const spec of this.specs) {
       this.states.set(spec.id, {
+        detected: false,
+        versionDetected: false,
         status: "stopped",
         stopRequested: false,
         currentPort: spec.defaultPort,
@@ -240,11 +248,11 @@ class DesktopRuntimeAdapterImpl implements DesktopRuntimeAdapter {
   }
 
   async detectTools(): Promise<ToolDetection[]> {
-    return Promise.all(this.specs.map((spec) => this.detectTool(spec)))
+    return Promise.all(this.specs.map((spec) => this.detectTool(spec, { includeVersion: true })))
   }
 
   async listToolInstances(): Promise<ToolInstance[]> {
-    await this.detectTools()
+    await Promise.all(this.specs.map((spec) => this.detectTool(spec, { includeVersion: false })))
     return Promise.all(this.specs.map((spec) => this.buildToolInstance(spec)))
   }
 
@@ -256,7 +264,7 @@ class DesktopRuntimeAdapterImpl implements DesktopRuntimeAdapter {
       return createJobResult(instanceId, "succeeded", `${spec.displayName} 已在运行。`)
     }
 
-    const detection = await this.detectTool(spec)
+    const detection = await this.detectTool(spec, { includeVersion: false })
     if (!detection.detected || !detection.binaryPath) {
       state.lastError = `${spec.displayName} 未检测到可执行文件。`
       state.status = "error"
@@ -280,7 +288,7 @@ class DesktopRuntimeAdapterImpl implements DesktopRuntimeAdapter {
     }
 
     const currentPort = startCommand.currentPort ?? instance.currentPort ?? instance.defaultPort
-    if (spec.kind === "opencode" && !(await isPortAvailable(currentPort))) {
+    if (spec.kind === "opencode" && !(await this.isPortAvailable(currentPort))) {
       state.lastError = `端口冲突：${currentPort} 已被占用。`
       state.status = "error"
       return createJobResult(instanceId, "failed", state.lastError)
@@ -329,15 +337,16 @@ class DesktopRuntimeAdapterImpl implements DesktopRuntimeAdapter {
       return createJobResult(instanceId, "failed", `${spec.displayName} 当前不是由 OMO-FRP 启动的运行态进程。`)
     }
 
+    const proc = state.process
     state.stopRequested = true
-    state.process.kill("SIGTERM")
+    proc.kill("SIGTERM")
 
     await Promise.race([
-      onceExit(state.process),
+      onceExit(proc),
       new Promise<void>((resolve) => setTimeout(resolve, 1500)).then(async () => {
-        if (state.process) {
-          state.process.kill("SIGKILL")
-          await onceExit(state.process)
+        if (proc.exitCode === null && proc.signalCode === null) {
+          proc.kill("SIGKILL")
+          await onceExit(proc)
         }
       }),
     ])
@@ -437,18 +446,33 @@ class DesktopRuntimeAdapterImpl implements DesktopRuntimeAdapter {
     return opencode.currentPort ?? DEFAULT_OPENCODE_PORT
   }
 
-  private async detectTool(spec: DesktopToolSpec): Promise<ToolDetection> {
+  private async detectTool(spec: DesktopToolSpec, options: { includeVersion: boolean }): Promise<ToolDetection> {
     const state = this.getState(spec.id)
-    const binaryPath = spec.resolveBinaryPath?.(this.env) ?? resolveBinaryPath(spec.binaryNames)
-    const configDirectory = spec.resolveConfigDirectory(this.runtimeDir, this.env)
-    const configFile = configDirectory ? resolveConfigFile(spec, configDirectory, this.runtimeDir) : undefined
-    const currentPort = spec.resolveCurrentPort?.(configFile, await this.resolveOpenCodePortFallback())
+    if (state.detected && (!options.includeVersion || state.versionDetected)) {
+      return {
+        kind: spec.kind,
+        displayName: spec.displayName,
+        detected: Boolean(state.binaryPath),
+        binaryPath: state.binaryPath,
+        version: state.version,
+        configDirectory: state.configDirectory,
+      }
+    }
 
+    const binaryPath = state.detected ? (state.binaryPath ?? null) : (spec.resolveBinaryPath?.(this.env) ?? resolveBinaryPath(spec.binaryNames))
+    const configDirectory = state.detected ? state.configDirectory : spec.resolveConfigDirectory(this.runtimeDir, this.env)
+    const configFile = configDirectory ? resolveConfigFile(spec, configDirectory, this.runtimeDir) : undefined
+    const currentPort = state.detected ? state.currentPort : spec.resolveCurrentPort?.(configFile, await this.resolveOpenCodePortFallback())
+
+    state.detected = true
     state.binaryPath = binaryPath ?? undefined
     state.configDirectory = configDirectory
     state.configFile = configFile
     state.currentPort = currentPort ?? state.currentPort ?? spec.defaultPort
-    state.version = binaryPath ? resolveVersion(binaryPath, spec.versionArgs) : undefined
+    if (options.includeVersion && !state.versionDetected) {
+      state.version = binaryPath ? resolveVersion(binaryPath, spec.versionArgs) : undefined
+      state.versionDetected = true
+    }
 
     return {
       kind: spec.kind,
@@ -716,7 +740,7 @@ async function appendTimestampedLog(state: ManagedToolState, level: LogLine["lev
     return
   }
 
-  const line = `${new Date().toISOString()} ${level} ${message}\n`
+  const line = `${new Date().toISOString()} ${level} ${redactSensitiveText(message)}\n`
   state.logTail = `${state.logTail}${line}`.slice(-LOG_TAIL_LIMIT)
   await appendFile(state.logPath, line)
 }
@@ -762,7 +786,7 @@ function parseLogLine(line: string): LogLine {
 
 function onceExit(proc: ChildProcessByStdio<null, Readable, Readable>): Promise<number | null> {
   return new Promise((resolve) => {
-    if (proc.exitCode !== null) {
+    if (proc.exitCode !== null || proc.signalCode !== null) {
       resolve(proc.exitCode)
       return
     }
