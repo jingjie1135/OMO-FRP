@@ -7,6 +7,8 @@ export interface DashboardViewModel {
   logs: LogLine[]
 }
 
+export type LoadDashboardViewModel = (client: ManagementClient) => Promise<DashboardViewModel>
+
 export async function loadDashboardViewModel(client: ManagementClient): Promise<DashboardViewModel> {
   const runtimeInfo = await client.getRuntimeInfo()
   const frpStatus = await client.getFrpStatus()
