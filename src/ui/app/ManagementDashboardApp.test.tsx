@@ -1,55 +1,188 @@
-import { describe, expect, it } from "bun:test"
-import { renderToStaticMarkup } from "react-dom/server"
+import { afterEach, describe, expect, it } from "bun:test"
+import { act } from "react"
+import { createRoot, type Root } from "react-dom/client"
+import type { ManagementClient } from "../../management-api/client"
 import type { DashboardViewModel } from "../features/dashboard/dashboard-view-model"
 import { ManagementDashboardApp } from "./ManagementDashboardApp"
 
-const dashboard: DashboardViewModel = {
-  runtimeInfo: {
-    capabilities: {
-      mode: "server",
-      canManageFrpServer: true,
-      canManageFrpClient: false,
-      canInstallServerServices: true,
-      canAccessLocalFilesystem: true,
-      canManageSystemd: true,
-      canManageLocalProcesses: true,
+const mountedRoots: Root[] = []
+
+afterEach(() => {
+  for (const root of mountedRoots.splice(0)) {
+    act(() => root.unmount())
+  }
+  document.body.innerHTML = ""
+})
+
+function createDashboard(message: string): DashboardViewModel {
+  return {
+    runtimeInfo: {
+      capabilities: {
+        mode: "server",
+        canManageFrpServer: true,
+        canManageFrpClient: false,
+        canInstallServerServices: true,
+        canAccessLocalFilesystem: true,
+        canManageSystemd: true,
+        canManageLocalProcesses: true,
+      },
+      config: {
+        mode: "server",
+        toolInstances: [
+          {
+            id: "opencode-server",
+            kind: "opencode",
+            displayName: "OpenCode",
+            hostType: "server",
+            installState: "configured",
+            defaultPort: 4096,
+            status: "running",
+          },
+        ],
+        pluginConfigs: [],
+        publicEndpoints: [],
+        frpClients: [],
+      },
     },
-    config: {
-      mode: "server",
-      toolInstances: [
-        {
-          id: "opencode-server",
-          kind: "opencode",
-          displayName: "OpenCode",
-          hostType: "server",
-          installState: "configured",
-          defaultPort: 4096,
-          status: "running",
-        },
-      ],
-      pluginConfigs: [],
-      publicEndpoints: [],
-      frpClients: [],
+    frpStatus: { mode: "server", running: true, message },
+    logs: [{ timestamp: "2026-05-14T10:00:00.000Z", level: "info", message: "OpenCode started" }],
+  }
+}
+
+function createClient(results: Array<DashboardViewModel | Error>): ManagementClient {
+  let callIndex = 0
+
+  return {
+    async getRuntimeInfo() {
+      const result = results[Math.min(callIndex, results.length - 1)]
+      if (result instanceof Error) throw result
+      return result.runtimeInfo
     },
-  },
-  frpStatus: {
-    mode: "server",
-    running: true,
-    message: "FRP server is running.",
-  },
-  logs: [{ timestamp: "2026-05-14T10:00:00.000Z", level: "info", message: "OpenCode started" }],
+    async getFrpStatus() {
+      const result = results[Math.min(callIndex, results.length - 1)]
+      if (result instanceof Error) throw result
+      return result.frpStatus
+    },
+    async getToolLogs() {
+      const result = results[Math.min(callIndex, results.length - 1)]
+      callIndex += 1
+      if (result instanceof Error) throw result
+      return result.logs
+    },
+    async detectTools() {
+      return []
+    },
+    async listToolInstances() {
+      return []
+    },
+    async installTool() {
+      return { jobId: "install", status: "succeeded", message: "installed" }
+    },
+    async startTool() {
+      return { jobId: "start", status: "succeeded", message: "started" }
+    },
+    async stopTool() {
+      return { jobId: "stop", status: "succeeded", message: "stopped" }
+    },
+    async restartTool() {
+      return { jobId: "restart", status: "succeeded", message: "restarted" }
+    },
+    async readConfig() {
+      return { target: { toolInstanceId: "opencode-server", kind: "opencode" }, content: "" }
+    },
+    async saveConfig() {},
+    async listPresets() {
+      return []
+    },
+    async applyPreset() {},
+    async listBackups() {
+      return []
+    },
+    async restoreBackup() {},
+    async listEndpoints() {
+      return []
+    },
+    async saveEndpoint() {},
+    async enableEndpoint() {
+      return { jobId: "enable", status: "succeeded", message: "enabled" }
+    },
+    async disableEndpoint() {
+      return { jobId: "disable", status: "succeeded", message: "disabled" }
+    },
+    async saveFrpConfig() {},
+    async startFrp() {
+      return { jobId: "start-frp", status: "succeeded", message: "started" }
+    },
+    async stopFrp() {
+      return { jobId: "stop-frp", status: "succeeded", message: "stopped" }
+    },
+  }
+}
+
+async function renderApp(client: ManagementClient) {
+  const container = document.createElement("div")
+  document.body.append(container)
+  const root = createRoot(container)
+  mountedRoots.push(root)
+
+  await act(async () => root.render(<ManagementDashboardApp client={client} />))
+  await act(async () => {})
+
+  return container
 }
 
 describe("ManagementDashboardApp", () => {
-  it("renders the shell navigation, runtime badge, and dashboard content", () => {
-    const html = renderToStaticMarkup(<ManagementDashboardApp dashboard={dashboard} />)
+  it("renders loading state before dashboard data resolves", async () => {
+    let resolveRuntimeInfo: (() => void) | undefined
+    const dashboard = createDashboard("FRP server is running.")
+    const client = createClient([dashboard])
+    const originalGetRuntimeInfo = client.getRuntimeInfo
+    client.getRuntimeInfo = async () => {
+      await new Promise<void>((resolve) => {
+        resolveRuntimeInfo = resolve
+      })
+      return originalGetRuntimeInfo()
+    }
 
-    expect(html).toContain("OpenCode Remote")
-    expect(html).toContain("主控台")
-    expect(html).toContain("工具管理")
-    expect(html).toContain("公网入口")
-    expect(html).toContain("服务器模式")
-    expect(html).toContain("FRP server is running.")
-    expect(html).toContain("OpenCode started")
+    const container = document.createElement("div")
+    document.body.append(container)
+    const root = createRoot(container)
+    mountedRoots.push(root)
+
+    await act(async () => root.render(<ManagementDashboardApp client={client} />))
+
+    expect(container.textContent).toContain("正在加载主控台数据")
+
+    await act(async () => resolveRuntimeInfo?.())
+  })
+
+  it("renders the shell navigation, runtime badge, and dashboard content", async () => {
+    const container = await renderApp(createClient([createDashboard("FRP server is running.")]))
+
+    expect(container.textContent).toContain("OpenCode Remote")
+    expect(container.textContent).toContain("主控台")
+    expect(container.textContent).toContain("工具管理")
+    expect(container.textContent).toContain("公网入口")
+    expect(container.textContent).toContain("服务器模式")
+    expect(container.textContent).toContain("FRP server is running.")
+    expect(container.textContent).toContain("OpenCode started")
+  })
+
+  it("shows an initial load failure with retry affordance", async () => {
+    const container = await renderApp(createClient([new Error("api unavailable")]))
+
+    expect(container.textContent).toContain("api unavailable")
+    expect(container.textContent).toContain("重试")
+  })
+
+  it("keeps dashboard content visible when refresh fails", async () => {
+    const container = await renderApp(createClient([createDashboard("ready"), new Error("refresh failed")]))
+    const refreshButton = Array.from(container.querySelectorAll("button")).find((button) => button.textContent?.includes("刷新"))
+
+    expect(refreshButton).toBeDefined()
+    await act(async () => refreshButton?.dispatchEvent(new MouseEvent("click", { bubbles: true })))
+
+    expect(container.textContent).toContain("ready")
+    expect(container.textContent).toContain("refresh failed")
   })
 })
