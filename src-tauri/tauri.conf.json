@@ -7,9 +7,10 @@
     "beforeDevCommand": "bun run --cwd .. dev:ui",
     "beforeBuildCommand": "bun run --cwd .. build:ui",
     "devUrl": "http://localhost:5173",
-    "frontendDist": "../dist"
+    "frontendDist": "../dist/ui"
   },
   "app": {
+    "withGlobalTauri": true,
     "windows": [
       {
         "title": "OpenCode Remote Platform",
