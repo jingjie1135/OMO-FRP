@@ -39,7 +39,7 @@ describe("CLI naming docs", () => {
     }
 
     expect(packageJson.scripts.test).toBe("bun test src/**/*.test.ts src/**/*.test.tsx")
-    expect(packageJson.scripts.typecheck).toBe("tsc --noEmit")
+    expect(packageJson.scripts.typecheck).toBe("bunx --bun tsc --noEmit")
     expect(packageJson.scripts.build).toBe("bun build src/cli-program.ts --outfile=dist/opencode-remote.js --target=bun")
     expect(packageJson.scripts.lint).toBe("bun run typecheck")
 
