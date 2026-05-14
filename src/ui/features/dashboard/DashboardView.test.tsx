@@ -92,6 +92,12 @@ describe("DashboardView", () => {
 
     expect(html).toContain("主控台")
     expect(html).toContain("服务器模式")
+    expect(html).toContain("运行能力")
+    expect(html).toContain("FRP Server 管理")
+    expect(html).toContain("可用")
+    expect(html).toContain("FRP Client 管理")
+    expect(html).toContain("不可用")
+    expect(html).toContain("systemd 管理")
     expect(html).toContain("2 个工具")
     expect(html).toContain("1 个运行中")
     expect(html).toContain("1 个已启用")

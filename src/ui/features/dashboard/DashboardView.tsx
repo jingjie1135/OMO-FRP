@@ -46,6 +46,21 @@ export function DashboardView({ runtimeInfo, frpStatus, logs }: DashboardViewPro
         <StatCard icon={<CheckCircle className="h-6 w-6 text-slate-500" />} title="最近任务状态" value={frpStatus.status ?? "idle"} subtitle={frpStatus.publicUrl ?? "暂无公网地址"} />
       </div>
 
+      <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+        <div className="mb-4">
+          <h2 className="text-sm font-medium text-slate-900">运行能力</h2>
+          <p className="mt-1 text-xs text-slate-500">当前运行时允许管理的本机和服务器能力。</p>
+        </div>
+        <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
+          {buildCapabilityItems(runtimeInfo).map((item) => (
+            <div key={item.label} className="flex items-center justify-between rounded-lg border border-slate-100 bg-slate-50 px-3 py-2">
+              <span className="text-sm text-slate-600">{item.label}</span>
+              <span className={`text-xs font-medium ${item.enabled ? "text-emerald-600" : "text-slate-400"}`}>{item.enabled ? "可用" : "不可用"}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+
       <div className="rounded-xl border border-slate-800 bg-slate-900">
         <div className="flex items-center justify-between border-b border-slate-800 bg-slate-800/50 px-4 py-3">
           <h2 className="flex items-center text-sm font-medium text-slate-200">
@@ -60,6 +75,19 @@ export function DashboardView({ runtimeInfo, frpStatus, logs }: DashboardViewPro
       </div>
     </section>
   )
+}
+
+function buildCapabilityItems(runtimeInfo: RuntimeInfo): Array<{ label: string; enabled: boolean }> {
+  return [
+    { label: "服务器模式", enabled: runtimeInfo.capabilities.mode === "server" },
+    { label: "桌面模式", enabled: runtimeInfo.capabilities.mode === "desktop" },
+    { label: "FRP Server 管理", enabled: runtimeInfo.capabilities.canManageFrpServer },
+    { label: "FRP Client 管理", enabled: runtimeInfo.capabilities.canManageFrpClient },
+    { label: "系统服务安装", enabled: runtimeInfo.capabilities.canInstallServerServices },
+    { label: "本地文件访问", enabled: runtimeInfo.capabilities.canAccessLocalFilesystem },
+    { label: "systemd 管理", enabled: runtimeInfo.capabilities.canManageSystemd },
+    { label: "本地进程管理", enabled: runtimeInfo.capabilities.canManageLocalProcesses },
+  ]
 }
 
 function StatCard({ icon, title, value, subtitle }: { icon: React.ReactNode; title: string; value: string; subtitle: string }) {
