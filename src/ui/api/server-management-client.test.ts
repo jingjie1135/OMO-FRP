@@ -37,4 +37,22 @@ describe("server management client", () => {
     ])
     expect(calls.every((call) => call.init?.method === "POST")).toBe(true)
   })
+
+  it("sends bearer authorization when a session token is configured", async () => {
+    const calls: Array<{ input: string; init?: RequestInit }> = []
+    const client = createServerManagementClient({
+      baseUrl: "http://127.0.0.1:4098",
+      sessionToken: "session-secret",
+      fetch: async (input, init) => {
+        calls.push({ input, init })
+        return new Response(JSON.stringify({ jobId: "start:tool", status: "succeeded", message: "ok" }), { status: 200 })
+      },
+    })
+
+    await client.startTool("tool-1")
+
+    const headers = new Headers(calls[0]?.init?.headers)
+    expect(headers.get("authorization")).toBe("Bearer session-secret")
+    expect(headers.get("content-type")).toBe("application/json")
+  })
 })

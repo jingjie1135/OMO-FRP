@@ -4,6 +4,7 @@ import type { ConfigTarget, FrpConfigRequest, InstallToolRequest } from "../../m
 export interface ServerManagementClientOptions {
   baseUrl: string
   fetch: (input: string, init?: RequestInit) => Promise<Response>
+  sessionToken?: string
 }
 
 export function createServerManagementClient(options: ServerManagementClientOptions): ManagementClient {
@@ -78,7 +79,7 @@ export function createServerManagementClient(options: ServerManagementClientOpti
 }
 
 async function getJson<T>(options: ServerManagementClientOptions, path: string): Promise<T> {
-  const response = await options.fetch(`${options.baseUrl}${path}`)
+  const response = await options.fetch(`${options.baseUrl}${path}`, { headers: createHeaders(options) })
   if (!response.ok) {
     throw new Error(`Management API request failed: ${response.status} ${path}`)
   }
@@ -88,7 +89,7 @@ async function getJson<T>(options: ServerManagementClientOptions, path: string):
 async function postJson<T>(options: ServerManagementClientOptions, path: string, body?: unknown): Promise<T> {
   const response = await options.fetch(`${options.baseUrl}${path}`, {
     method: "POST",
-    headers: { "content-type": "application/json" },
+    headers: createHeaders(options, { "content-type": "application/json" }),
     body: body === undefined ? undefined : JSON.stringify(body),
   })
   if (!response.ok) {
@@ -99,4 +100,12 @@ async function postJson<T>(options: ServerManagementClientOptions, path: string,
 
 async function postVoid(options: ServerManagementClientOptions, path: string, body?: unknown): Promise<void> {
   await postJson<unknown>(options, path, body)
+}
+
+function createHeaders(options: ServerManagementClientOptions, headers: Record<string, string> = {}): HeadersInit {
+  if (!options.sessionToken) {
+    return headers
+  }
+
+  return { ...headers, authorization: `Bearer ${options.sessionToken}` }
 }
