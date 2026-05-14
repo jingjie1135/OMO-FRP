@@ -46,4 +46,12 @@ describe("frontend shell configuration", () => {
     expect(html).toContain('<div id="root"></div>')
     expect(html).toContain('<script type="module" src="/main.tsx"></script>')
   })
+
+  it("renders the React app before loading Dashboard data", async () => {
+    const mainSource = await readFile(join(root, "src", "ui", "main.tsx"), "utf8")
+
+    expect(mainSource).toContain("createBrowserManagementClient")
+    expect(mainSource).toContain("<ManagementDashboardApp client={createBrowserManagementClient()} />")
+    expect(mainSource).not.toContain("loadDashboardViewModel")
+  })
 })
