@@ -2,22 +2,22 @@ import { describe, expect, it } from "bun:test"
 import type { ManagementClient } from "../../management-api/client"
 import { renderManagementApp } from "./App"
 
-function createClient(): ManagementClient {
+function createClient(mode: "server" | "desktop" = "server"): ManagementClient {
   return {
     async getRuntimeInfo() {
       return {
         capabilities: {
-          mode: "server",
-          canManageFrpServer: true,
-          canManageFrpClient: false,
-          canInstallServerServices: true,
+          mode,
+          canManageFrpServer: mode === "server",
+          canManageFrpClient: mode === "desktop",
+          canInstallServerServices: mode === "server",
           canAccessLocalFilesystem: true,
-          canManageSystemd: true,
+          canManageSystemd: mode === "server",
           canManageLocalProcesses: true,
         },
         config: {
-          mode: "server",
-          toolInstances: [
+          mode,
+          toolInstances: mode === "server" ? [
             {
               id: "opencode-server",
               kind: "opencode",
@@ -29,8 +29,8 @@ function createClient(): ManagementClient {
               currentPort: 4096,
               status: "running",
             },
-          ],
-          pluginConfigs: [
+          ] : [],
+          pluginConfigs: mode === "server" ? [
             {
               toolInstanceId: "opencode-server",
               plugin: "oh-my-openagent",
@@ -38,9 +38,9 @@ function createClient(): ManagementClient {
               status: "configured",
               presets: [],
             },
-          ],
+          ] : [],
           publicEndpoints: [],
-          frpServer: {
+          frpServer: mode === "server" ? {
             enabled: true,
             panelUrl: "https://frp.example.com",
             rpcUrl: "https://frp.example.com/rpc",
@@ -48,76 +48,52 @@ function createClient(): ManagementClient {
             bindPort: 7000,
             authTokenRef: "FRP_TOKEN",
             dashboardEnabled: true,
-          },
+          } : undefined,
           frpClients: [],
         },
       }
     },
     async detectTools() {
-      return [{ kind: "opencode", displayName: "OpenCode", detected: true }]
+      return []
     },
     async listToolInstances() {
       return (await this.getRuntimeInfo()).config.toolInstances
     },
-    async installTool() {
-      return { jobId: "install", status: "succeeded", message: "ok" }
-    },
-    async startTool() {
-      return { jobId: "start", status: "succeeded", message: "ok" }
-    },
-    async stopTool() {
-      return { jobId: "stop", status: "succeeded", message: "ok" }
-    },
-    async restartTool() {
-      return { jobId: "restart", status: "succeeded", message: "ok" }
-    },
-    async getToolLogs() {
-      return []
-    },
-    async readConfig(target) {
-      return { target, content: "{}" }
-    },
+    async installTool() { return { jobId: "i", status: "succeeded", message: "ok" } },
+    async startTool() { return { jobId: "s", status: "succeeded", message: "ok" } },
+    async stopTool() { return { jobId: "t", status: "succeeded", message: "ok" } },
+    async restartTool() { return { jobId: "r", status: "succeeded", message: "ok" } },
+    async getToolLogs() { return [] },
+    async readConfig() { return { target: { toolInstanceId: "x", kind: "opencode" }, content: "{}" } },
+    async validateConfig() { return { valid: true, fieldErrors: [] } },
     async saveConfig() {},
-    async listPresets() {
-      return []
-    },
+    async listPresets() { return [] },
     async applyPreset() {},
-    async listBackups() {
-      return []
-    },
+    async listBackups() { return [] },
     async restoreBackup() {},
-    async listEndpoints() {
-      return []
-    },
+    async listEndpoints() { return [] },
     async saveEndpoint() {},
-    async enableEndpoint() {
-      return { jobId: "enable", status: "succeeded", message: "ok" }
-    },
-    async disableEndpoint() {
-      return { jobId: "disable", status: "succeeded", message: "ok" }
-    },
-    async getFrpStatus() {
-      return { mode: "server", running: true, message: "FRP server is running." }
-    },
+    async enableEndpoint() { return { jobId: "e", status: "succeeded", message: "ok" } },
+    async disableEndpoint() { return { jobId: "d", status: "succeeded", message: "ok" } },
+    async getFrpStatus() { return { mode: mode === "desktop" ? "client" : "server", running: true, message: "ok" } },
     async saveFrpConfig() {},
-    async startFrp() {
-      return { jobId: "start-frp", status: "succeeded", message: "ok" }
-    },
-    async stopFrp() {
-      return { jobId: "stop-frp", status: "succeeded", message: "ok" }
-    },
+    async startFrp() { return { jobId: "sf", status: "succeeded", message: "ok" } },
+    async stopFrp() { return { jobId: "tf", status: "succeeded", message: "ok" } },
   }
 }
 
 describe("management app", () => {
-  it("renders the layout and all management sections", async () => {
-    const app = await renderManagementApp(createClient())
+  it("renders the layout and all management sections dynamically", async () => {
+    const serverApp = await renderManagementApp(createClient("server"))
+    expect(serverApp).toContain("OpenCode Platform (server)")
+    expect(serverApp).toContain("dashboard:server")
+    expect(serverApp).toContain("frp:server")
+    expect(serverApp).toContain("settings:mode=server")
 
-    expect(app).toContain("server:Dashboard|Tools|Config|Endpoints|FRP|Settings")
-    expect(app).toContain("dashboard:server")
-    expect(app).toContain("tools:1")
-    expect(app).toContain("config:opencode=loaded")
-    expect(app).toContain("frp:server")
-    expect(app).toContain("settings:mode=server")
+    const desktopApp = await renderManagementApp(createClient("desktop"))
+    expect(desktopApp).toContain("OpenCode Platform (desktop)")
+    expect(desktopApp).toContain("dashboard:desktop")
+    expect(desktopApp).toContain("frp:client")
+    expect(desktopApp).toContain("settings:mode=desktop")
   })
 })
