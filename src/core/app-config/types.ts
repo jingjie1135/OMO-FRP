@@ -40,7 +40,7 @@ export const DESKTOP_CAPABILITIES: RuntimeCapabilities = {
   canManageLocalProcesses: true,
 }
 
-export type ToolKind = Extract<CoreToolKind, "opencode"> | "frpc" | "cloudflared" | "future-tool"
+export type ToolKind = Extract<CoreToolKind, "opencode"> | "frpc" | "cloudflared" | "bun" | "oh-my-openagent" | "docker" | "docker-compose" | "caddy" | "future-tool"
 export type ToolHostType = "server" | "desktop"
 export type ToolInstallState = "missing" | "detected" | "installed" | "configured"
 export type ToolRuntimeStatus = "stopped" | "starting" | "running" | "error"

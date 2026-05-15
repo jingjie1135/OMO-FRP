@@ -9,6 +9,7 @@ import type {
   InstallToolRequest,
   JobResult,
   LogLine,
+  ManagementToolKind,
   ToolDetection,
 } from "./types"
 import { validateEndpoint } from "../core/endpoints/endpoint-service"
@@ -133,6 +134,28 @@ export function createLocalManagementRuntime(options: CreateLocalManagementRunti
       return readConfigDocument(storage, resolvedTarget)
     },
 
+    async validateConfig(target: ConfigTarget, content: string): Promise<import("./types").ConfigValidationResult> {
+      if (!content.trim()) {
+        return {
+          valid: false,
+          fieldErrors: [{ field: "content", message: "Content cannot be empty" }],
+        }
+      }
+
+      if (target.kind === "oh-my-openagent") {
+        try {
+          JSON.parse(content)
+        } catch (error) {
+          return {
+            valid: false,
+            fieldErrors: [{ field: "content", message: error instanceof Error ? error.message : String(error) }],
+          }
+        }
+      }
+
+      return { valid: true, fieldErrors: [] }
+    },
+
     async saveConfig(target: ConfigTarget, content: string): Promise<void> {
       const resolvedTarget = await resolveConfigTarget(state.config, storage, target)
       const configPath = requireTargetPath(resolvedTarget)
@@ -199,6 +222,9 @@ export function createLocalManagementRuntime(options: CreateLocalManagementRunti
       const backupContent = await storage.readText(backupPath)
       if (backupContent === null) {
         throw new Error(`Cannot restore missing backup: ${backupPath}`)
+      }
+      if (await storage.exists(configPath)) {
+        await storage.backup(configPath)
       }
       await saveConfigDocument(storage, resolvedTarget, backupContent)
       markConfigSaved(state.config, resolvedTarget)
@@ -307,10 +333,10 @@ function cloneValue<T>(value: T): T {
   return JSON.parse(JSON.stringify(value)) as T
 }
 
-function createManagedTool(kind: ToolKind, hostType: ToolHostType, configDirectory: string): ToolInstance {
+function createManagedTool(kind: ManagementToolKind, hostType: ToolHostType, configDirectory: string): ToolInstance {
   return {
     id: `${kind}-${hostType}`,
-    kind,
+    kind: kind === "opencode" ? "opencode" : kind === "frpc" ? "frpc" : kind === "cloudflared" ? "cloudflared" : "future-tool",
     displayName: kind === "opencode" ? "OpenCode" : kind,
     hostType,
     installState: "installed",

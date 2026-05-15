@@ -10,8 +10,10 @@ import type {
 
 export type { RuntimeInfo }
 
+export type ManagementToolKind = ToolKind | "bun" | "oh-my-openagent" | "docker" | "docker-compose" | "caddy"
+
 export interface ToolDetection {
-  kind: ToolKind
+  kind: ManagementToolKind
   displayName: string
   detected: boolean
   binaryPath?: string
@@ -20,7 +22,7 @@ export interface ToolDetection {
 }
 
 export interface InstallToolRequest {
-  kind: ToolKind
+  kind: ManagementToolKind
   version?: string
   targetDirectory?: string
 }
@@ -47,6 +49,9 @@ export interface ConfigDocument {
   target: ConfigTarget
   content: string
   updatedAt?: string
+  path?: string
+  missing?: boolean
+  error?: string
 }
 
 export interface ConfigBackup {
@@ -54,6 +59,16 @@ export interface ConfigBackup {
   target: ConfigTarget
   path: string
   createdAt: string
+}
+
+export interface ConfigValidationFieldError {
+  field: string
+  message: string
+}
+
+export interface ConfigValidationResult {
+  valid: boolean
+  fieldErrors: ConfigValidationFieldError[]
 }
 
 export type FrpFailureReason =
