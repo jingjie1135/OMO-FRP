@@ -73,14 +73,42 @@ fn get_tool_logs(_instance_id: String) -> serde_json::Value {
 
 #[tauri::command(rename_all = "snake_case")]
 fn read_config(target: serde_json::Value) -> serde_json::Value {
+    let path = target.get("path").cloned().unwrap_or(serde_json::Value::Null);
     serde_json::json!({
         "target": target,
-        "content": "{}"
+        "content": "{}",
+        "path": path,
+        "updatedAt": "2026-05-16T00:00:00.000Z"
     })
 }
 
 #[tauri::command(rename_all = "snake_case")]
 fn save_config(_target: serde_json::Value, _content: String) {}
+
+#[tauri::command(rename_all = "snake_case")]
+fn validate_config(_target: serde_json::Value, content: String) -> serde_json::Value {
+    let mut valid = true;
+    let mut field_errors = Vec::new();
+
+    if content.trim().is_empty() {
+        valid = false;
+        field_errors.push(serde_json::json!({
+            "field": "content",
+            "message": "Content cannot be empty"
+        }));
+    } else if let Err(error) = serde_json::from_str::<serde_json::Value>(&content) {
+        valid = false;
+        field_errors.push(serde_json::json!({
+            "field": "content",
+            "message": error.to_string()
+        }));
+    }
+
+    serde_json::json!({
+        "valid": valid,
+        "fieldErrors": field_errors,
+    })
+}
 
 #[tauri::command(rename_all = "snake_case")]
 fn list_presets(_target: serde_json::Value) -> serde_json::Value {
@@ -170,6 +198,7 @@ pub fn run() {
             restart_tool,
             get_tool_logs,
             read_config,
+            validate_config,
             save_config,
             list_presets,
             apply_preset,

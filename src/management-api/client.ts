@@ -3,6 +3,7 @@ import type {
   ConfigDocument,
   ConfigPreset,
   ConfigTarget,
+  ConfigValidationResult,
   FrpConfigRequest,
   FrpStatus,
   InstallToolRequest,
@@ -25,6 +26,7 @@ export interface ManagementClient {
   getToolLogs(instanceId: string): Promise<LogLine[]>
 
   readConfig(target: ConfigTarget): Promise<ConfigDocument>
+  validateConfig(target: ConfigTarget, content: string): Promise<ConfigValidationResult>
   saveConfig(target: ConfigTarget, content: string): Promise<void>
   listPresets(target: ConfigTarget): Promise<ConfigPreset[]>
   applyPreset(target: ConfigTarget, presetId: string): Promise<void>

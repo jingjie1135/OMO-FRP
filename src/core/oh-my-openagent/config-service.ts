@@ -11,7 +11,12 @@ export async function readConfigDocument(storage: StorageAdapter, target: Config
     throw new Error(`Cannot read missing config: ${target.path}`)
   }
 
-  return { target, content }
+  return {
+    target,
+    content,
+    path: target.path,
+    updatedAt: new Date().toISOString(),
+  }
 }
 
 export async function saveConfigDocument(storage: StorageAdapter, target: ConfigTarget, content: string): Promise<void> {

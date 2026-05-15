@@ -34,6 +34,9 @@ export function createTauriManagementClient(bridge: TauriInvokeBridge): Manageme
     readConfig(target: ConfigTarget) {
       return invokeTyped(bridge, "read_config", { target })
     },
+    validateConfig(target: ConfigTarget, content: string) {
+      return invokeTyped(bridge, "validate_config", { target, content })
+    },
     saveConfig(target: ConfigTarget, content: string) {
       return invokeTyped(bridge, "save_config", { target, content })
     },

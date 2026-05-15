@@ -36,6 +36,9 @@ export function createServerManagementClient(options: ServerManagementClientOpti
     readConfig(target: ConfigTarget) {
       return postJson(options, "/api/config/read", target)
     },
+    validateConfig(target: ConfigTarget, content: string) {
+      return postJson(options, "/api/config/validate", { target, content })
+    },
     saveConfig(target: ConfigTarget, content: string) {
       return postVoid(options, "/api/config/save", { target, content })
     },

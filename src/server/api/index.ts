@@ -59,6 +59,11 @@ export function createServerApi(options: ServerApiOptions = {}): ServerApi {
         return jsonResponse(await adapter.readConfig(body as ConfigTarget))
       }
 
+      if (path === "/api/config/validate" && method === "POST") {
+        const payload = body as { target: ConfigTarget; content: string }
+        return jsonResponse(await adapter.validateConfig(payload.target, payload.content))
+      }
+
       if (path === "/api/config/save" && method === "POST") {
         const payload = body as { target: ConfigTarget; content: string }
         await adapter.saveConfig(payload.target, payload.content)
