@@ -89,6 +89,9 @@ function createClient(calls: string[]): ManagementClient {
     async readConfig(target) {
       return { target, content: "{}" }
     },
+    async validateConfig() {
+      return { valid: true, fieldErrors: [] }
+    },
     async saveConfig() {},
     async listPresets() {
       return []

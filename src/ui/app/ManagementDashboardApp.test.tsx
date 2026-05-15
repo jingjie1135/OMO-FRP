@@ -90,6 +90,9 @@ function createClient(results: Array<DashboardViewModel | Error>): ManagementCli
     async readConfig() {
       return { target: { toolInstanceId: "opencode-server", kind: "opencode" }, content: "" }
     },
+    async validateConfig() {
+      return { valid: true, fieldErrors: [] }
+    },
     async saveConfig() {},
     async listPresets() {
       return []

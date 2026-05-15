@@ -1,4 +1,7 @@
-import { describe, expect, it } from "bun:test"
+import { afterEach, describe, expect, it } from "bun:test"
+import React, { act } from "react"
+import { createRoot, type Root } from "react-dom/client"
+import { ActionRunner } from "../app/action-runner"
 import type { RuntimeInfo } from "../../management-api/types"
 import { ConfigPage } from "./config/ConfigPage"
 import { DashboardPage } from "./dashboard/DashboardPage"
@@ -6,6 +9,95 @@ import { EndpointsPage } from "./endpoints/EndpointsPage"
 import { FrpPage } from "./frp/FrpPage"
 import { SettingsPage } from "./settings/SettingsPage"
 import { ToolsPage } from "./tools/ToolsPage"
+import type { ManagementClient } from "../../management-api/client"
+
+const mountedRoots: Root[] = []
+
+afterEach(() => {
+  for (const root of mountedRoots.splice(0)) {
+    act(() => root.unmount())
+  }
+  document.body.innerHTML = ""
+})
+
+function render(element: React.ReactNode) {
+  const container = document.createElement("div")
+  document.body.append(container)
+  const root = createRoot(container)
+  mountedRoots.push(root)
+  act(() => root.render(element))
+  return container
+}
+
+function createToolsPageClient(instances: RuntimeInfo["config"]["toolInstances"], detections: Array<{ kind: "opencode" | "bun" | "oh-my-openagent" | "docker" | "docker-compose" | "caddy" | "frpc" | "cloudflared" | "future-tool"; displayName: string; detected: boolean }>, logs: Array<{ timestamp: string; level: "debug" | "info" | "warn" | "error"; message: string }> = []): ManagementClient {
+  return {
+    async getRuntimeInfo() {
+      return {
+        ...serverInfo,
+        config: {
+          ...serverInfo.config,
+          toolInstances: instances,
+        },
+      }
+    },
+    async detectTools() {
+      return detections
+    },
+    async listToolInstances() {
+      return instances
+    },
+    async installTool() {
+      return { jobId: "install", status: "succeeded", message: "ok" }
+    },
+    async startTool() {
+      return { jobId: "start", status: "succeeded", message: "ok" }
+    },
+    async stopTool() {
+      return { jobId: "stop", status: "succeeded", message: "ok" }
+    },
+    async restartTool() {
+      return { jobId: "restart", status: "succeeded", message: "ok" }
+    },
+    async getToolLogs() {
+      return logs
+    },
+    async readConfig() {
+      return { target: { toolInstanceId: "opencode-server", kind: "opencode" }, content: "{}" }
+    },
+    async validateConfig() {
+      return { valid: true, fieldErrors: [] }
+    },
+    async saveConfig() {},
+    async listPresets() {
+      return []
+    },
+    async applyPreset() {},
+    async listBackups() {
+      return []
+    },
+    async restoreBackup() {},
+    async listEndpoints() {
+      return []
+    },
+    async saveEndpoint() {},
+    async enableEndpoint() {
+      return { jobId: "enable", status: "succeeded", message: "ok" }
+    },
+    async disableEndpoint() {
+      return { jobId: "disable", status: "succeeded", message: "ok" }
+    },
+    async getFrpStatus() {
+      return { mode: "server", running: true, message: "FRP server is running." }
+    },
+    async saveFrpConfig() {},
+    async startFrp() {
+      return { jobId: "start-frp", status: "succeeded", message: "ok" }
+    },
+    async stopFrp() {
+      return { jobId: "stop-frp", status: "succeeded", message: "ok" }
+    },
+  }
+}
 
 const serverInfo: RuntimeInfo = {
   capabilities: {
@@ -67,67 +159,147 @@ const serverInfo: RuntimeInfo = {
 }
 
 describe("management UI pages", () => {
-  it("renders dashboard capability matrix", () => {
-    const page = DashboardPage(serverInfo)
+  it("renders dashboard capability matrix with visible reasons", () => {
+    const container = render(<DashboardPage info={serverInfo} />)
 
-    expect(page).toContain("dashboard:server")
-    expect(page).toContain("capabilities:frpServer=true")
-    expect(page).toContain("state:ready")
+    const summary = container.querySelector('[data-testid="dashboard-summary"]')
+    expect(summary?.textContent).toContain("dashboard:server")
+    expect(summary?.textContent).toContain("capabilities:frpServer=true")
+    expect(summary?.textContent).toContain("state:ready")
+
+    // Semantic verification
+    expect(container.querySelector('h1')?.textContent).toBe("主控台")
+    expect(container.querySelectorAll('article').length).toBeGreaterThan(0)
+
+    // Reason verification
+    expect(container.textContent).toContain("当前为服务器模式")
   })
 
-  it("renders tools, config, endpoints, and settings states", () => {
-    expect(
-      ToolsPage({
-        tools: serverInfo.config.toolInstances,
-        detections: [{ kind: "opencode", displayName: "OpenCode", detected: true }],
-        lastAction: "start",
-      }),
-    ).toContain("instances:OpenCode:configured:running")
+  it("renders tools, config, endpoints, and settings states with semantic sections", async () => {
+    const toolsContainer = render(
+      <ToolsPage
+        client={createToolsPageClient(serverInfo.config.toolInstances, [{ kind: "opencode", displayName: "OpenCode", detected: true }])}
+      />,
+    )
+    await act(async () => {})
 
-    expect(
-      ConfigPage({
-        opencode: { target: { toolInstanceId: "opencode-server", kind: "opencode" }, content: "{}" },
-        ohMyOpenAgent: { target: { toolInstanceId: "opencode-server", kind: "oh-my-openagent" }, content: "{}" },
-        presets: [{ id: "fast", name: "fast", path: "/tmp/fast.json", updatedAt: "2026-05-13T04:00:00Z" }],
-        backups: [{ id: "20260513T040000Z", target: { toolInstanceId: "opencode-server", kind: "oh-my-openagent" }, path: "/tmp/backup", createdAt: "20260513T040000Z" }],
-      }),
-    ).toContain("presets:fast")
+    expect(toolsContainer.textContent).toContain("OpenCode")
+    expect(toolsContainer.querySelector('h2#detections-heading')).toBeTruthy()
+    expect(toolsContainer.querySelector('h2#instances-heading')).toBeTruthy()
+    expect(toolsContainer.querySelector('h1')?.textContent).toContain("Tools Management")
 
-    expect(EndpointsPage({ endpoints: serverInfo.config.publicEndpoints })).toContain("Desktop Route:disabled:desktop-frp:ok")
-    expect(SettingsPage(serverInfo)).toContain("settings:mode=server")
+    const configContainer = render(
+      <ConfigPage
+        client={createToolsPageClient([], [])}
+        opencode={{ target: { toolInstanceId: "opencode-server", kind: "opencode" }, content: "{}" }}
+        ohMyOpenAgent={{ target: { toolInstanceId: "opencode-server", kind: "oh-my-openagent" }, content: "{}" }}
+        presets={[{ id: "fast", name: "fast", path: "/tmp/fast.json", updatedAt: "2026-05-13T04:00:00Z" }]}
+        backups={[
+          {
+            id: "20260513T040000Z",
+            target: { toolInstanceId: "opencode-server", kind: "oh-my-openagent" },
+            path: "/tmp/backup",
+            createdAt: "20260513T040000Z",
+          },
+        ]}
+      />,
+    )
+    expect(configContainer.textContent).toContain("fast")
+    expect(configContainer.textContent).toContain("/tmp/fast.json")
+    expect(configContainer.querySelector('h2#target-selection-heading')).toBeTruthy()
+    expect(configContainer.querySelector('h2#editor-heading')).toBeTruthy()
+    expect(configContainer.querySelector('h2#presets-heading')).toBeTruthy()
+    expect(configContainer.querySelector('h2#backups-heading')).toBeTruthy()
+
+    const endpointsContainer = render(<EndpointsPage endpoints={serverInfo.config.publicEndpoints} />)
+    expect(endpointsContainer.textContent).toContain("Desktop Route:disabled:desktop-frp:ok")
+    expect(endpointsContainer.querySelector('h2#endpoint-list-heading')).toBeTruthy()
+    expect(endpointsContainer.querySelector('h2#endpoint-editor-heading')).toBeTruthy()
+    expect(endpointsContainer.querySelector('h2#endpoint-validation-heading')).toBeTruthy()
+    expect(endpointsContainer.querySelector('h2#endpoint-enable-heading')).toBeTruthy()
+    expect(endpointsContainer.querySelector('h2#endpoint-disable-heading')).toBeTruthy()
+    expect(endpointsContainer.querySelector('h2#diagnostics-heading')).toBeTruthy()
+
+    const settingsContainer = render(<SettingsPage info={serverInfo} />)
+    expect(settingsContainer.textContent).toContain("settings:mode=server")
+    expect(settingsContainer.querySelector('h2#runtime-heading')).toBeTruthy()
+    expect(settingsContainer.querySelector('h2#security-heading')).toBeTruthy()
+    expect(settingsContainer.querySelector('h2#backups-heading')).toBeTruthy()
+    expect(settingsContainer.querySelector('h2#diagnostics-heading')).toBeTruthy()
   })
 
-  it("renders loading and error states", () => {
-    expect(ConfigPage({ presets: [], backups: [], loading: true })).toBe("config:loading")
-    expect(ToolsPage({ tools: [], detections: [], error: "boom" })).toBe("tools:error:boom")
-    expect(EndpointsPage({ endpoints: [], loading: true })).toBe("endpoints:loading")
+  it("renders loading and error states with accessible roles", async () => {
+    const configContainer = render(
+      <ConfigPage
+        client={createToolsPageClient([], [])}
+        presets={[]}
+        backups={[]}
+      />
+    )
+    expect(configContainer.textContent).toContain("All changes saved")
+
+    const toolsContainer = render(<ToolsPage client={createToolsPageClient([], [])} />)
+    await act(async () => {})
+
+    const endpointsContainer = render(<EndpointsPage endpoints={[]} loading={true} />)
+    expect(endpointsContainer.textContent).toContain("endpoints:loading")
+    expect(endpointsContainer.querySelector('.animate-spin')).toBeTruthy()
   })
 
-  it("branches FRP page by runtime capability", () => {
-    const serverPage = FrpPage({
-      capabilities: serverInfo.capabilities,
-      status: { mode: "server", running: true, message: "FRP server is running." },
-      endpoints: serverInfo.config.publicEndpoints,
-    })
+  it("branches FRP page by runtime capability with visible reasons", () => {
+    const container = render(
+      <FrpPage
+        capabilities={serverInfo.capabilities}
+        status={{ mode: "server", running: true, message: "FRP server is running." }}
+        endpoints={serverInfo.config.publicEndpoints}
+      />,
+    )
 
-    const desktopPage = FrpPage({
-      capabilities: {
-        mode: "desktop",
-        canManageFrpServer: false,
-        canManageFrpClient: true,
-        canInstallServerServices: false,
-        canAccessLocalFilesystem: true,
-        canManageSystemd: false,
-        canManageLocalProcesses: true,
-      },
-      status: { mode: "client", running: false, message: "frpc is not configured yet." },
-      endpoints: serverInfo.config.publicEndpoints,
-    })
+    expect(container.textContent).toContain("frp:server")
+    expect(container.textContent).toContain("server-frp:running")
+    expect(container.textContent).toContain("FRP Server Panel")
+    expect(container.textContent).toContain("Desktop frpc operations are not supported in server mode")
 
-    expect(serverPage).toContain("frp:server")
-    expect(serverPage).toContain("server-frp:running")
-    expect(desktopPage).toContain("frp:client")
-    expect(desktopPage).toContain("client-frp:stopped")
-    expect(desktopPage).toContain("endpoint-route:frp.example.com:7000:4096")
+    document.body.innerHTML = ""
+    const desktopContainer = render(
+      <FrpPage
+        capabilities={{
+          mode: "desktop",
+          canManageFrpServer: false,
+          canManageFrpClient: true,
+          canInstallServerServices: false,
+          canAccessLocalFilesystem: true,
+          canManageSystemd: false,
+          canManageLocalProcesses: true,
+        }}
+        status={{ mode: "client", running: false, message: "frpc is not configured yet." }}
+        endpoints={serverInfo.config.publicEndpoints}
+      />,
+    )
+
+    expect(desktopContainer.textContent).toContain("frp:client")
+    expect(desktopContainer.textContent).toContain("client-frp:stopped")
+    expect(desktopContainer.textContent).toContain("FRP Client Panel")
+    expect(desktopContainer.textContent).toContain("FRP server and system service management are restricted in desktop mode")
+    expect(desktopContainer.textContent).toContain("endpoint-route:frp.example.com:7000:4096")
+
+    document.body.innerHTML = ""
+    const unavailableContainer = render(
+      <FrpPage
+        capabilities={{
+          mode: "server",
+          canManageFrpServer: false,
+          canManageFrpClient: false,
+          canInstallServerServices: false,
+          canAccessLocalFilesystem: false,
+          canManageSystemd: false,
+          canManageLocalProcesses: false,
+        }}
+        status={{ mode: "unavailable", running: false, message: "No capabilities" }}
+        endpoints={[]}
+      />,
+    )
+    expect(unavailableContainer.querySelector('[role="alert"]')).toBeTruthy()
+    expect(unavailableContainer.textContent).toContain("Reason: Both canManageFrpServer and canManageFrpClient are false")
   })
 })
