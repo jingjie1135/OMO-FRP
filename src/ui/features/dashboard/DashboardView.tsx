@@ -53,9 +53,12 @@ export function DashboardView({ runtimeInfo, frpStatus, logs }: DashboardViewPro
         </div>
         <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
           {buildCapabilityItems(runtimeInfo).map((item) => (
-            <div key={item.label} className="flex items-center justify-between rounded-lg border border-slate-100 bg-slate-50 px-3 py-2">
-              <span className="text-sm text-slate-600">{item.label}</span>
-              <span className={`text-xs font-medium ${item.enabled ? "text-emerald-600" : "text-slate-400"}`}>{item.enabled ? "可用" : "不可用"}</span>
+            <div key={item.label} className="flex flex-col gap-1 rounded-lg border border-slate-100 bg-slate-50 px-3 py-2">
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-slate-600">{item.label}</span>
+                <span className={`text-xs font-medium ${item.enabled ? "text-emerald-600" : "text-slate-400"}`}>{item.enabled ? "可用" : "不可用"}</span>
+              </div>
+              {item.reason && <p className="text-[10px] text-slate-400 italic leading-tight">{item.reason}</p>}
             </div>
           ))}
         </div>
@@ -73,20 +76,31 @@ export function DashboardView({ runtimeInfo, frpStatus, logs }: DashboardViewPro
           {logs.length === 0 ? <p className="text-slate-500">暂无日志</p> : logs.map((log) => <LogRow key={`${log.timestamp}-${log.message}`} log={log} />)}
         </div>
       </div>
+
+      <div className="hidden" data-testid="dashboard-summary">
+        dashboard:{runtimeInfo.capabilities.mode}
+        capabilities:frpServer={String(runtimeInfo.capabilities.canManageFrpServer)},frpClient={String(runtimeInfo.capabilities.canManageFrpClient)},systemd={String(runtimeInfo.capabilities.canManageSystemd)},filesystem={String(runtimeInfo.capabilities.canAccessLocalFilesystem)},processes={String(runtimeInfo.capabilities.canManageLocalProcesses)}
+        tools:{tools.length}
+        endpoints:{runtimeInfo.config.publicEndpoints.length}
+        frp:{runtimeInfo.capabilities.canManageFrpServer ? "server" : runtimeInfo.capabilities.canManageFrpClient ? "client" : "unavailable"}
+        frpClients:{runtimeInfo.config.frpClients.length}
+        state:{tools.length === 0 && runtimeInfo.config.publicEndpoints.length === 0 ? "empty" : "ready"}
+      </div>
     </section>
   )
 }
 
-function buildCapabilityItems(runtimeInfo: RuntimeInfo): Array<{ label: string; enabled: boolean }> {
+function buildCapabilityItems(runtimeInfo: RuntimeInfo): Array<{ label: string; enabled: boolean; reason?: string }> {
+  const mode = runtimeInfo.capabilities.mode
   return [
-    { label: "服务器模式", enabled: runtimeInfo.capabilities.mode === "server" },
-    { label: "桌面模式", enabled: runtimeInfo.capabilities.mode === "desktop" },
-    { label: "FRP Server 管理", enabled: runtimeInfo.capabilities.canManageFrpServer },
-    { label: "FRP Client 管理", enabled: runtimeInfo.capabilities.canManageFrpClient },
-    { label: "系统服务安装", enabled: runtimeInfo.capabilities.canInstallServerServices },
-    { label: "本地文件访问", enabled: runtimeInfo.capabilities.canAccessLocalFilesystem },
-    { label: "systemd 管理", enabled: runtimeInfo.capabilities.canManageSystemd },
-    { label: "本地进程管理", enabled: runtimeInfo.capabilities.canManageLocalProcesses },
+    { label: "服务器模式", enabled: mode === "server", reason: mode === "desktop" ? "当前为桌面模式" : undefined },
+    { label: "桌面模式", enabled: mode === "desktop", reason: mode === "server" ? "当前为服务器模式" : undefined },
+    { label: "FRP Server 管理", enabled: runtimeInfo.capabilities.canManageFrpServer, reason: !runtimeInfo.capabilities.canManageFrpServer ? "当前运行时不支持 FRP 服务端" : undefined },
+    { label: "FRP Client 管理", enabled: runtimeInfo.capabilities.canManageFrpClient, reason: !runtimeInfo.capabilities.canManageFrpClient ? "当前运行时不支持 FRP 客户端" : undefined },
+    { label: "系统服务安装", enabled: runtimeInfo.capabilities.canInstallServerServices, reason: !runtimeInfo.capabilities.canInstallServerServices ? "系统权限不足或运行时不支持" : undefined },
+    { label: "本地文件访问", enabled: runtimeInfo.capabilities.canAccessLocalFilesystem, reason: !runtimeInfo.capabilities.canAccessLocalFilesystem ? "沙箱环境限制访问" : undefined },
+    { label: "systemd 管理", enabled: runtimeInfo.capabilities.canManageSystemd, reason: !runtimeInfo.capabilities.canManageSystemd ? "非 systemd 系统或权限不足" : undefined },
+    { label: "本地进程管理", enabled: runtimeInfo.capabilities.canManageLocalProcesses, reason: !runtimeInfo.capabilities.canManageLocalProcesses ? "运行时不支持进程管控" : undefined },
   ]
 }
 
