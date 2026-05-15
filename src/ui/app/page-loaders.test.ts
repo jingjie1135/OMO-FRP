@@ -1,4 +1,6 @@
-import { describe, expect, it } from "bun:test"
+import { afterEach, describe, expect, it } from "bun:test"
+import React, { act } from "react"
+import { createRoot, type Root } from "react-dom/client"
 import type { ManagementClient } from "../../management-api/client"
 import {
   loadConfigPage,
@@ -8,6 +10,24 @@ import {
   loadSettingsPage,
   loadToolsPage,
 } from "./page-loaders"
+
+const mountedRoots: Root[] = []
+
+afterEach(() => {
+  for (const root of mountedRoots.splice(0)) {
+    act(() => root.unmount())
+  }
+  document.body.innerHTML = ""
+})
+
+function render(element: React.ReactNode) {
+  const container = document.createElement("div")
+  document.body.append(container)
+  const root = createRoot(container)
+  mountedRoots.push(root)
+  act(() => root.render(element))
+  return container
+}
 
 function createClient(): ManagementClient {
   return {
@@ -95,6 +115,9 @@ function createClient(): ManagementClient {
     async readConfig(target) {
       return { target, content: "{}" }
     },
+    async validateConfig() {
+      return { valid: true, fieldErrors: [] }
+    },
     async saveConfig() {},
     async listPresets() {
       return [{ id: "fast", name: "fast", path: "/tmp/fast.json", updatedAt: "2026-05-13T04:00:00Z" }]
@@ -131,11 +154,30 @@ describe("page loaders", () => {
   it("loads all management pages through the management client", async () => {
     const client = createClient()
 
-    expect(await loadDashboardPage(client)).toContain("dashboard:server")
-    expect(await loadToolsPage(client)).toContain("detections:OpenCode=detected")
-    expect(await loadConfigPage(client)).toContain("config:oh-my-openagent=loaded")
-    expect(await loadEndpointsPage(client)).toContain("Desktop Route:disabled:desktop-frp:ok")
-    expect(await loadFrpPage(client)).toContain("frp:server")
-    expect(await loadSettingsPage(client)).toContain("settings:mode=server")
+    const dashboard = (await loadDashboardPage(client)) as React.ReactElement
+    const dashboardContainer = render(dashboard)
+    expect(dashboardContainer.querySelector('[data-testid="dashboard-summary"]')?.textContent).toContain("dashboard:server")
+
+    const tools = (await loadToolsPage(client)) as React.ReactElement
+    const toolsContainer = render(tools)
+    await act(async () => {})
+    await act(async () => {})
+    expect(toolsContainer.textContent).toContain("OpenCode")
+
+    const config = (await loadConfigPage(client)) as React.ReactElement
+    const configContainer = render(config)
+    expect(configContainer.textContent).toContain("All changes saved")
+
+    const endpoints = (await loadEndpointsPage(client)) as React.ReactElement
+    const endpointsContainer = render(endpoints)
+    expect(endpointsContainer.textContent).toContain("Desktop Route:disabled:desktop-frp:ok")
+
+    const frp = (await loadFrpPage(client)) as React.ReactElement
+    const frpContainer = render(frp)
+    expect(frpContainer.textContent).toContain("frp:server")
+
+    const settings = (await loadSettingsPage(client)) as React.ReactElement
+    const settingsContainer = render(settings)
+    expect(settingsContainer.textContent).toContain("settings:mode=server")
   })
 })
