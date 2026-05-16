@@ -170,7 +170,11 @@ describe("page loaders", () => {
 
     const endpoints = (await loadEndpointsPage(client)) as React.ReactElement
     const endpointsContainer = render(endpoints)
-    expect(endpointsContainer.textContent).toContain("Desktop Route:disabled:desktop-frp:ok")
+    await act(async () => {})
+    await act(async () => {})
+    expect(endpointsContainer.textContent).toContain("Desktop Route")
+    expect(endpointsContainer.textContent).toContain("desktop.example.com")
+    expect(endpointsContainer.textContent).toContain("desktop-frp")
 
     const frp = (await loadFrpPage(client)) as React.ReactElement
     const frpContainer = render(frp)

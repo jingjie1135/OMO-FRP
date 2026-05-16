@@ -3,7 +3,7 @@ import type { ManagementClient } from "../../management-api/client"
 import type { ConfigDocument, ConfigTarget } from "../../management-api/types"
 import { ConfigPage } from "../features/config/ConfigPage"
 import { DashboardPage } from "../features/dashboard/DashboardPage"
-import { EndpointsPage } from "../features/endpoints/EndpointsPage"
+import { EndpointsPageWrapper } from "../features/endpoints/EndpointsPageWrapper"
 import { FrpPage } from "../features/frp/FrpPage"
 import { SettingsPage } from "../features/settings/SettingsPage"
 import { ToolsPage } from "../features/tools/ToolsPage"
@@ -77,8 +77,7 @@ export async function loadConfigPage(client: ManagementClient): Promise<React.Re
 }
 
 export async function loadEndpointsPage(client: ManagementClient): Promise<React.ReactNode> {
-  const endpoints = await client.listEndpoints()
-  return React.createElement(EndpointsPage, { endpoints })
+  return React.createElement(EndpointsPageWrapper, { client })
 }
 
 export async function loadFrpPage(client: ManagementClient): Promise<React.ReactNode> {
