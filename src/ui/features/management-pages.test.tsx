@@ -211,8 +211,17 @@ describe("management UI pages", () => {
     expect(configContainer.querySelector('h2#presets-heading')).toBeTruthy()
     expect(configContainer.querySelector('h2#backups-heading')).toBeTruthy()
 
-    const endpointsContainer = render(<EndpointsPage endpoints={serverInfo.config.publicEndpoints} />)
-    expect(endpointsContainer.textContent).toContain("Desktop Route:disabled:desktop-frp:ok")
+    const endpointsContainer = render(
+      <EndpointsPage
+        endpoints={serverInfo.config.publicEndpoints}
+        saveEndpoint={async () => {}}
+        enableEndpoint={async () => {}}
+        disableEndpoint={async () => {}}
+        checkSafety={() => ({ ok: true, issues: [], suggestion: "Endpoint is ready to enable." })}
+      />,
+    )
+    expect(endpointsContainer.textContent).toContain("Desktop Route")
+    expect(endpointsContainer.textContent).toContain("disabled")
     expect(endpointsContainer.querySelector('h2#endpoint-list-heading')).toBeTruthy()
     expect(endpointsContainer.querySelector('h2#endpoint-editor-heading')).toBeTruthy()
     expect(endpointsContainer.querySelector('h2#endpoint-validation-heading')).toBeTruthy()
@@ -241,9 +250,17 @@ describe("management UI pages", () => {
     const toolsContainer = render(<ToolsPage client={createToolsPageClient([], [])} />)
     await act(async () => {})
 
-    const endpointsContainer = render(<EndpointsPage endpoints={[]} loading={true} />)
-    expect(endpointsContainer.textContent).toContain("endpoints:loading")
-    expect(endpointsContainer.querySelector('.animate-spin')).toBeTruthy()
+    const endpointsContainer = render(
+      <EndpointsPage
+        endpoints={[]}
+        loading={true}
+        saveEndpoint={async () => {}}
+        enableEndpoint={async () => {}}
+        disableEndpoint={async () => {}}
+        checkSafety={() => ({ ok: true, issues: [], suggestion: "Endpoint is ready to enable." })}
+      />,
+    )
+    expect(endpointsContainer.textContent).toContain("Loading endpoints...")
   })
 
   it("branches FRP page by runtime capability with visible reasons", () => {
