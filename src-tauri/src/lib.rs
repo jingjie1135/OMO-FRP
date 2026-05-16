@@ -138,8 +138,8 @@ fn save_endpoint(_endpoint: serde_json::Value) {}
 fn enable_endpoint(id: String) -> serde_json::Value {
     serde_json::json!({
         "jobId": format!("enable-endpoint:{}", id),
-        "status": "succeeded",
-        "message": format!("{} enabled.", id)
+        "status": "failed",
+        "message": "Endpoint enablement is unavailable until the desktop runtime can run safety checks."
     })
 }
 

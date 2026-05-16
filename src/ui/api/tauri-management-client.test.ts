@@ -1,5 +1,6 @@
 import { describe, expect, it } from "bun:test"
 import { createTauriManagementClient } from "./tauri-management-client"
+import type { PublicEndpoint } from "../../management-api/types"
 
 describe("tauri management client", () => {
   it("loads runtime info through invoke", async () => {
@@ -33,6 +34,8 @@ describe("tauri management client", () => {
           command === "start_tool" ||
           command === "stop_tool" ||
           command === "restart_tool" ||
+          command === "enable_endpoint" ||
+          command === "disable_endpoint" ||
           command === "start_frp" ||
           command === "stop_frp"
         ) {
@@ -48,6 +51,19 @@ describe("tauri management client", () => {
     expect((await client.startTool("opencode-desktop")).status).toBe("succeeded")
     expect((await client.stopTool("opencode-desktop")).status).toBe("succeeded")
     expect((await client.restartTool("opencode-desktop")).status).toBe("succeeded")
+    const endpoint: PublicEndpoint = {
+      id: "desktop-route",
+      name: "Desktop Route",
+      domain: "desktop.example.com",
+      protocol: "https",
+      targetType: "desktop-frp",
+      targetToolInstanceId: "opencode-desktop",
+      authMode: "opencode-password",
+      status: "disabled",
+    }
+    await client.saveEndpoint(endpoint)
+    expect((await client.enableEndpoint(endpoint.id)).status).toBe("succeeded")
+    expect((await client.disableEndpoint(endpoint.id)).status).toBe("succeeded")
     expect((await client.getFrpStatus()).mode).toBe("client")
     expect((await client.startFrp()).status).toBe("succeeded")
     expect((await client.stopFrp()).status).toBe("succeeded")
@@ -58,6 +74,9 @@ describe("tauri management client", () => {
       "start_tool",
       "stop_tool",
       "restart_tool",
+      "save_endpoint",
+      "enable_endpoint",
+      "disable_endpoint",
       "get_frp_status",
       "start_frp",
       "stop_frp",
