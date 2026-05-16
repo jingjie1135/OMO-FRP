@@ -4,7 +4,7 @@ import type { ConfigDocument, ConfigTarget } from "../../management-api/types"
 import { ConfigPage } from "../features/config/ConfigPage"
 import { DashboardPage } from "../features/dashboard/DashboardPage"
 import { EndpointsPageWrapper } from "../features/endpoints/EndpointsPageWrapper"
-import { FrpPage } from "../features/frp/FrpPage"
+import { FrpPageWrapper } from "../features/frp/FrpPageWrapper"
 import { SettingsPage } from "../features/settings/SettingsPage"
 import { ToolsPage } from "../features/tools/ToolsPage"
 
@@ -81,8 +81,12 @@ export async function loadEndpointsPage(client: ManagementClient): Promise<React
 }
 
 export async function loadFrpPage(client: ManagementClient): Promise<React.ReactNode> {
-  const [info, status, endpoints] = await Promise.all([client.getRuntimeInfo(), client.getFrpStatus(), client.listEndpoints()])
-  return React.createElement(FrpPage, { capabilities: info.capabilities, status, endpoints })
+  const [initialRuntimeInfo, initialStatus, initialEndpoints] = await Promise.all([
+    client.getRuntimeInfo(),
+    client.getFrpStatus(),
+    client.listEndpoints(),
+  ])
+  return React.createElement(FrpPageWrapper, { client, initialRuntimeInfo, initialStatus, initialEndpoints })
 }
 
 export async function loadSettingsPage(client: ManagementClient): Promise<React.ReactNode> {
