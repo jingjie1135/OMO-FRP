@@ -37,7 +37,7 @@
 - [x] **Task 4: Tools detection, install, process control, and logs loop**
 - [x] **Task 5: Config, preset, backup, and restore loop**
 - [x] **Task 6: Endpoint management and safety-check loop**
-- [ ] **Task 7: FRP server/client management loop**
+- [x] **Task 7: FRP server/client management loop**
 - [ ] **Task 8: Cloudflare Tunnel quick/named flow**
 - [ ] **Task 9: Settings, security checks, backup summary, and diagnostics export**
 - [ ] **Task 10: Cross-feature integration, acceptance pass, and release readiness**
@@ -360,7 +360,7 @@
 
 ## Task 7: FRP Server/Client Management Loop
 
-**Status:** Not complete.
+**Status:** Complete.
 
 **Purpose:** Complete FRP management for server and desktop modes so FRP status, configuration, start/stop, and failure guidance are usable.
 
@@ -383,29 +383,29 @@
 **Checklist:**
 
 - [x] Keep FRP page branching based on `RuntimeCapabilities`.
-- [ ] Server mode displays frp-panel URL, RPC URL, server address, bind port, dashboard status, client list, and desktop connection information.
-- [ ] Server mode validates panel URL, RPC URL, server address, bind port, auth token ref, and masked token behavior before save.
-- [ ] Server mode supports saving FRP server configuration.
-- [ ] Server mode supports starting and stopping FRP server when capability allows it.
-- [ ] Desktop mode displays server address, server port, token ref or imported connection config, local OpenCode port, subdomain/proxy name, generated frpc config, public URL, and connection status.
-- [ ] Desktop mode validates OpenCode running, local port reachable, server address present, token ref present, subdomain/proxy name legal, and frpc binary available before start.
-- [ ] Desktop mode supports saving FRP client configuration.
-- [ ] Desktop mode supports starting and stopping frpc when capability allows it.
-- [ ] Map FRP failure reasons to guidance: `auth_failed`, `api_unreachable`, `rpc_unreachable`, `proxy_not_ready`, `local_service_unreachable`, `client_not_ready`, `timeout`, and `unknown`.
-- [ ] Refresh FRP status and endpoints after successful FRP start/stop.
+- [x] Server mode displays frp-panel URL, RPC URL, server address, bind port, dashboard status, client list, and desktop connection information.
+- [x] Server mode validates panel URL, RPC URL, server address, bind port, auth token ref, and masked token behavior before save.
+- [x] Server mode supports saving FRP server configuration.
+- [x] Server mode supports starting and stopping FRP server when capability allows it.
+- [x] Desktop mode displays server address, server port, token ref or imported connection config, local OpenCode port, subdomain/proxy name, generated frpc config, public URL, and connection status.
+- [x] Desktop mode validates OpenCode running, local port reachable, server address present, token ref present, subdomain/proxy name legal, and frpc binary available before start.
+- [x] Desktop mode supports saving FRP client configuration.
+- [x] Desktop mode supports starting and stopping frpc when capability allows it.
+- [x] Map FRP failure reasons to guidance: `auth_failed`, `api_unreachable`, `rpc_unreachable`, `proxy_not_ready`, `local_service_unreachable`, `client_not_ready`, `timeout`, and `unknown`.
+- [x] Refresh FRP status and endpoints after successful FRP start/stop.
 
 **Acceptance:**
 
-- [ ] Server runtime only shows FRP server operations.
-- [ ] Desktop runtime only shows FRP client operations.
-- [ ] Unavailable runtime blocks FRP actions and explains why.
-- [ ] FRP failures provide actionable suggestions.
+- [x] Server runtime only shows FRP server operations.
+- [x] Desktop runtime only shows FRP client operations.
+- [x] Unavailable runtime blocks FRP actions and explains why.
+- [x] FRP failures provide actionable suggestions.
 
 **Verification:**
 
-- [ ] Run: `bun test src/ui/features/frp`
-- [ ] Run: `bun run typecheck`
-- [ ] Run: `bun run build:ui`
+- [x] Run: `bun test src/ui/features/frp`
+- [x] Run: `bun run typecheck`
+- [x] Run: `bun run build:ui`
 
 ---
 
