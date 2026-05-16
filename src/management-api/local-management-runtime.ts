@@ -12,7 +12,7 @@ import type {
   ManagementToolKind,
   ToolDetection,
 } from "./types"
-import { validateEndpoint } from "../core/endpoints/endpoint-service"
+import { checkEndpointSafety, normalizeEndpointAddress } from "../core/endpoints/endpoint-service"
 import {
   findOhMyOpenAgentConfigPath,
   joinConfigPath,
@@ -235,12 +235,13 @@ export function createLocalManagementRuntime(options: CreateLocalManagementRunti
     },
 
     async saveEndpoint(endpoint: PublicEndpoint): Promise<void> {
+      const normalizedEndpoint = { ...normalizeEndpointAddress(endpoint), status: "disabled" as const }
       const existingIndex = state.config.publicEndpoints.findIndex((item) => item.id === endpoint.id)
       if (existingIndex >= 0) {
-        state.config.publicEndpoints.splice(existingIndex, 1, cloneValue(endpoint))
+        state.config.publicEndpoints.splice(existingIndex, 1, cloneValue(normalizedEndpoint))
         return
       }
-      state.config.publicEndpoints.push(cloneValue(endpoint))
+      state.config.publicEndpoints.push(cloneValue(normalizedEndpoint))
     },
 
     async enableEndpoint(id: string): Promise<JobResult> {
@@ -249,11 +250,18 @@ export function createLocalManagementRuntime(options: CreateLocalManagementRunti
         return createJobResult("enable-endpoint", id, "failed", `Unknown endpoint: ${id}`)
       }
 
-      const validation = validateEndpoint({ ...endpoint, status: "active" })
+      const validation = checkEndpointSafety({ ...endpoint, status: "active" }, {
+        capabilities: options.capabilities,
+        toolInstances: state.config.toolInstances,
+        endpoints: state.config.publicEndpoints,
+      })
       if (!validation.ok) {
         return createJobResult("enable-endpoint", id, "failed", validation.issues.map((issue) => issue.message).join(" "))
       }
 
+      const normalizedEndpoint = normalizeEndpointAddress(endpoint)
+      endpoint.protocol = normalizedEndpoint.protocol
+      endpoint.domain = normalizedEndpoint.domain
       endpoint.status = "active"
       return createJobResult("enable-endpoint", id, "succeeded", `${endpoint.name} is now active.`)
     },
