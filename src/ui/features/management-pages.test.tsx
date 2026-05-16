@@ -298,7 +298,7 @@ describe("management UI pages", () => {
     expect(desktopContainer.textContent).toContain("client-frp:stopped")
     expect(desktopContainer.textContent).toContain("FRP Client Panel")
     expect(desktopContainer.textContent).toContain("FRP server and system service management are restricted in desktop mode")
-    expect(desktopContainer.textContent).toContain("endpoint-route:frp.example.com:7000:4096")
+    expect(desktopContainer.textContent).toContain("endpoint-route:not configured:7000:4096")
 
     document.body.innerHTML = ""
     const unavailableContainer = render(
