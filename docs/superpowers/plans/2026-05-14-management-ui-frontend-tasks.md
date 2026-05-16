@@ -36,7 +36,7 @@
 - [x] **Task 3: Shared async action, job, error, and refresh infrastructure**
 - [x] **Task 4: Tools detection, install, process control, and logs loop**
 - [x] **Task 5: Config, preset, backup, and restore loop**
-- [ ] **Task 6: Endpoint management and safety-check loop**
+- [x] **Task 6: Endpoint management and safety-check loop**
 - [ ] **Task 7: FRP server/client management loop**
 - [ ] **Task 8: Cloudflare Tunnel quick/named flow**
 - [ ] **Task 9: Settings, security checks, backup summary, and diagnostics export**
@@ -311,7 +311,7 @@
 
 ## Task 6: Endpoint Management and Safety-Check Loop
 
-**Status:** Not complete.
+**Status:** Complete.
 
 **Purpose:** Make public endpoint management safe and usable, with disabled-by-default behavior and explicit safety checks before exposure.
 
@@ -329,32 +329,32 @@
 
 **Checklist:**
 
-- [ ] Display endpoint list with ID, name, domain or URL, protocol, target type, target tool instance, auth mode, and status.
-- [ ] Support endpoint types: `server-local`, `desktop-frp`, and `cloudflare` when returned by runtime capabilities.
-- [ ] Create new endpoints in disabled state by default.
-- [ ] Edit endpoint name, domain or URL, protocol, target type, target instance, and auth mode.
-- [ ] Validate domain or URL format before save.
-- [ ] Validate target tool instance exists before save.
-- [ ] Validate auth mode satisfies safety requirements before save.
-- [ ] Validate target type is compatible with current runtime mode before save.
-- [ ] Run safety checks before enable: OpenCode running, password configured, endpoint auth configured, FRP/Cloudflare available, target port reachable, public address generatable, no obvious endpoint conflict.
-- [ ] Block enable when any safety check fails.
-- [ ] Preserve endpoint previous state if enable fails.
-- [ ] Confirm disable and preserve endpoint configuration after disable.
-- [ ] Add endpoint diagnostics with target running, local port, FRP/Cloudflare reachability, auth completeness, recent error, and fix suggestion.
+- [x] Display endpoint list with ID, name, domain or URL, protocol, target type, target tool instance, auth mode, and status.
+- [x] Support endpoint types: `server-local`, `desktop-frp`, and `cloudflare` when returned by runtime capabilities.
+- [x] Create new endpoints in disabled state by default.
+- [x] Edit endpoint name, domain or URL, protocol, target type, target instance, and auth mode.
+- [x] Validate domain or URL format before save.
+- [x] Validate target tool instance exists before save.
+- [x] Validate auth mode satisfies safety requirements before save.
+- [x] Validate target type is compatible with current runtime mode before save.
+- [x] Run safety checks before enable: OpenCode running, password configured, endpoint auth configured, FRP/Cloudflare available, target port reachable, public address generatable, no obvious endpoint conflict.
+- [x] Block enable when any safety check fails.
+- [x] Preserve endpoint previous state if enable fails.
+- [x] Confirm disable and preserve endpoint configuration after disable.
+- [x] Add endpoint diagnostics with target running, local port, FRP/Cloudflare reachability, auth completeness, recent error, and fix suggestion.
 
 **Acceptance:**
 
-- [ ] User can list, create, edit, enable, disable, and diagnose endpoints.
-- [ ] Unsafe endpoints cannot be enabled.
-- [ ] Endpoint enable success shows public URL and auth mode.
-- [ ] Disable does not delete endpoint configuration.
+- [x] User can list, create, edit, enable, disable, and diagnose endpoints.
+- [x] Unsafe endpoints cannot be enabled.
+- [x] Endpoint enable success shows public URL and auth mode.
+- [x] Disable does not delete endpoint configuration.
 
 **Verification:**
 
-- [ ] Run: `bun test src/ui/features/endpoints`
-- [ ] Run: `bun run typecheck`
-- [ ] Run: `bun run build:ui`
+- [x] Run: `bun test src/ui/features/endpoints`
+- [x] Run: `bun run typecheck`
+- [x] Run: `bun run build:ui`
 
 ---
 
