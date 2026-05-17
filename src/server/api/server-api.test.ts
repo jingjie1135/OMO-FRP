@@ -123,7 +123,8 @@ describe("server api", () => {
     expect(bodyText).not.toContain("SECRET_JSON")
     expect(bodyText).not.toContain("SECRET_PASSWORD")
     expect(bodyText).not.toContain("OPENCODE_SERVER_PASSWORD=SECRET")
-    expect(bodyText).toContain("[REDACTED]")
+    expect(bodyText).toContain('"redactedLogs"')
+    expect(bodyText).toContain('"runtime"')
   })
 
   it("requires an administrator session for management endpoints", async () => {
