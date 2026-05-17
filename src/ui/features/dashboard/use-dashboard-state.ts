@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react"
 import type { ManagementClient } from "../../../management-api/client"
 import type { DashboardViewModel, LoadDashboardViewModel } from "./dashboard-view-model"
 import { loadDashboardViewModel } from "./dashboard-view-model"
+import { redactSensitiveText } from "../../../shared/redact-sensitive-text"
 
 export interface DashboardState {
   dashboard: DashboardViewModel | null
@@ -45,7 +46,7 @@ export function useDashboardState(client: ManagementClient, loader: LoadDashboar
         if (!isCurrentRequest()) {
           return
         }
-        setErrorMessage(error instanceof Error ? error.message : "主控台数据加载失败。")
+        setErrorMessage(error instanceof Error ? redactSensitiveText(error.message) : "主控台数据加载失败。")
       } finally {
         if (!isCurrentRequest()) {
           return

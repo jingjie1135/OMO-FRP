@@ -235,12 +235,13 @@ describe("useDashboardState", () => {
   })
 
   it("keeps previous data visible when refresh fails", async () => {
-    const { snapshots, refresh } = await renderProbe(createClient([createDashboard("ready"), new Error("network down")]))
+    const { snapshots, refresh } = await renderProbe(createClient([createDashboard("ready"), new Error("network down token=raw-refresh-token")]))
 
     await refresh()
 
     expect(snapshots.at(-1)).toContain('"message":"ready"')
-    expect(snapshots.at(-1)).toContain('"error":"network down"')
+    expect(snapshots.at(-1)).toContain('"error":"network down token=[REDACTED]"')
+    expect(snapshots.at(-1)).not.toContain("raw-refresh-token")
   })
 
   it("ignores stale responses when an older refresh resolves after a newer refresh", async () => {
