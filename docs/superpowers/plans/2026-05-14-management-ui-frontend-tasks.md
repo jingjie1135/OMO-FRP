@@ -38,8 +38,8 @@
 - [x] **Task 5: Config, preset, backup, and restore loop**
 - [x] **Task 6: Endpoint management and safety-check loop**
 - [x] **Task 7: FRP server/client management loop**
-- [ ] **Task 8: Cloudflare Tunnel quick/named flow**
-- [ ] **Task 9: Settings, security checks, backup summary, and diagnostics export**
+- [x] **Task 8: Cloudflare Tunnel quick/named flow**
+- [x] **Task 9: Settings, security checks, backup summary, and diagnostics export**
 - [ ] **Task 10: Cross-feature integration, acceptance pass, and release readiness**
 
 ---
@@ -411,49 +411,56 @@
 
 ## Task 8: Cloudflare Tunnel Quick/Named Flow
 
-**Status:** Not complete.
+**Status:** Complete.
 
 **Purpose:** Add Cloudflare Tunnel UI flows described by the PRD without coupling the frontend directly to shell commands.
 
 **Files:**
 
-- Create: `src/ui/features/cloudflare/CloudflareTunnelPage.tsx`
-- Create: `src/ui/features/cloudflare/CloudflareTunnelPage.test.tsx`
-- Create: `src/ui/features/cloudflare/use-cloudflare-tunnel-state.ts`
-- Create: `src/ui/features/cloudflare/use-cloudflare-tunnel-state.test.tsx`
-- Modify: `src/ui/routes/routes.tsx`
-- Modify: `src/management-api/client.ts`
-- Modify: `src/ui/api/server-management-client.ts`
-- Modify: `src/ui/api/tauri-management-client.ts`
-- Modify: relevant server/Tauri runtime handlers when frontend contract changes require backend support.
+- Complete: `src/ui/features/cloudflare/CloudflareTunnelPage.tsx`
+- Complete: `src/ui/features/cloudflare/CloudflareTunnelPage.test.tsx`
+- Complete: `src/ui/features/cloudflare/CloudflareTunnelPageWrapper.tsx`
+- Complete: `src/ui/features/cloudflare/use-cloudflare-tunnel-state.ts`
+- Complete: `src/ui/features/cloudflare/use-cloudflare-tunnel-state.test.tsx`
+- Complete: `src/ui/routes/routes.tsx`
+- Complete: `src/ui/app/App.tsx`
+- Complete: `src/ui/app/page-loaders.ts`
+- Complete: `src/management-api/client.ts`
+- Complete: `src/management-api/types.ts`
+- Complete: `src/management-api/local-management-runtime.ts`
+- Complete: `src/server/api/index.ts`
+- Complete: `src/server/runtime-adapter.ts`
+- Complete: `src-tauri/src/lib.rs`
+- Complete: `src/ui/api/server-management-client.ts`
+- Complete: `src/ui/api/tauri-management-client.ts`
 
 **Checklist:**
 
-- [ ] Add route entry for Cloudflare Tunnel when runtime capabilities expose tunnel support.
-- [ ] Quick tunnel flow lets user choose local port and shows local target address.
-- [ ] Quick tunnel flow shows command summary, generated temporary public URL when available, cloudflared detection state, and errors.
-- [ ] Named tunnel flow collects hostname, tunnel name, local target port, and DNS route information.
-- [ ] Named tunnel flow displays step states for login, create tunnel, configure DNS, write config, start tunnel, and verify public access.
-- [ ] Each named tunnel step supports success, failure, and retry states.
-- [ ] UI never directly executes shell commands; it requests runtime actions through `ManagementClient`.
+- [x] Add route entry for Cloudflare Tunnel when runtime capabilities expose tunnel support.
+- [x] Quick tunnel flow lets user choose local port and shows local target address.
+- [x] Quick tunnel flow shows command summary, generated temporary public URL when available, cloudflared detection state, and errors.
+- [x] Named tunnel flow collects hostname, tunnel name, local target port, and DNS route information.
+- [x] Named tunnel flow displays step states for login, create tunnel, configure DNS, write config, start tunnel, and verify public access.
+- [x] Each named tunnel step supports success, failure, and retry states.
+- [x] UI never directly executes shell commands; it requests runtime actions through `ManagementClient`.
 
 **Acceptance:**
 
-- [ ] User can understand both quick and named tunnel flows from the UI.
-- [ ] Failure state identifies the failed step and offers retry.
-- [ ] No secret or command output is displayed without redaction.
+- [x] User can understand both quick and named tunnel flows from the UI.
+- [x] Failure state identifies the failed step and offers retry.
+- [x] No secret or command output is displayed without redaction.
 
 **Verification:**
 
-- [ ] Run: `bun test src/ui/features/cloudflare`
-- [ ] Run: `bun run typecheck`
-- [ ] Run: `bun run build:ui`
+- [x] Run: `bun test src/ui/features/cloudflare`
+- [x] Run: `bun run typecheck`
+- [x] Run: `bun run build:ui`
 
 ---
 
 ## Task 9: Settings, Security Checks, Backup Summary, and Diagnostics Export
 
-**Status:** Not complete.
+**Status:** Complete.
 
 **Purpose:** Finish Settings as the safety and diagnostics hub for runtime information, security posture, backups, and redacted diagnostics.
 
@@ -467,83 +474,38 @@
 - Modify: `src/management-api/client.ts`
 - Modify: `src/ui/api/server-management-client.ts`
 - Modify: `src/ui/api/tauri-management-client.ts`
-- Modify: relevant server/Tauri runtime handlers when frontend contract changes require backend support.
+- Modify: `src/server/api/index.ts`
+- Modify: `src/server/runtime-adapter.ts`
+- Modify: `src/management-api/local-management-runtime.ts`
 
 **Checklist:**
 
-- [ ] Display current runtime mode.
-- [ ] Display platform version.
-- [ ] Display config root directory when available.
-- [ ] Display capability matrix or link to capability details.
-- [ ] Display management API address in server mode.
-- [ ] Display Tauri bridge status in desktop mode.
-- [ ] Display security checks: OpenCode password, endpoint auth, FRP token ref, cleartext secret risk, log redaction, backup availability.
-- [ ] Display backup count, last backup time, backup directory, and backup failure records.
-- [ ] Add manual backup action when runtime supports it.
-- [ ] Add backup restore entry point or link to Config restore flow.
-- [ ] Add old-backup cleanup action only when backend reports support.
-- [ ] Export diagnostics containing runtime info, tool detection, endpoint status, FRP status, recent job results, and redacted logs.
-- [ ] Ensure exported diagnostics never contain cleartext secrets.
+- [x] Display current runtime mode.
+- [x] Display platform version.
+- [x] Display config root directory when available.
+- [x] Display capability matrix or link to capability details.
+- [x] Display management API address in server mode.
+- [x] Display Tauri bridge status in desktop mode.
+- [x] Display security checks: OpenCode password, endpoint auth, FRP token ref, cleartext secret risk, log redaction, backup availability.
+- [x] Display backup count, last backup time, backup directory, and backup failure records.
+- [x] Add manual backup action when runtime supports it.
+- [x] Add backup restore entry point or link to Config restore flow.
+- [x] Add old-backup cleanup action only when backend reports support.
+- [x] Export diagnostics containing runtime info, tool detection, endpoint status, FRP status, recent job results, and redacted logs.
+- [x] Ensure exported diagnostics never contain cleartext secrets.
 
 **Acceptance:**
 
-- [ ] Settings explains current runtime and security posture.
-- [ ] Diagnostics export is useful for debugging and redacted by default.
-- [ ] Backup actions are capability-gated and confirmed before high-risk operations.
+- [x] Settings explains current runtime and security posture.
+- [x] Diagnostics export is useful for debugging and redacted by default.
+- [x] Backup actions are capability-gated and confirmed before high-risk operations.
 
 **Verification:**
 
-- [ ] Run: `bun test src/ui/features/settings`
-- [ ] Run: `bun run typecheck`
-- [ ] Run: `bun run build:ui`
+- [x] Run: `bun test src/ui/features/settings`
+- [x] Run: `bun run typecheck`
+- [x] Run: `bun run build:ui`
 
----
-
-## Task 10: Cross-Feature Integration, Acceptance Pass, and Release Readiness
-
-**Status:** Not complete.
-
-**Purpose:** Verify the full management UI satisfies the PRD as an integrated product, not only as isolated pages.
-
-**Files:**
-
-- Modify: `src/ui/app/App.tsx`
-- Modify: `src/ui/routes/routes.tsx`
-- Modify: `src/ui/app/page-loaders.ts`
-- Create or modify: `src/ui/app/management-ui-acceptance.test.tsx`
-- Modify: `docs/guide/management-ui.md`
-- Modify: `README.md` if the user-facing startup flow changes.
-
-**Checklist:**
-
-- [ ] Verify browser/server mode starts and calls server `ManagementClient`.
-- [ ] Verify Tauri desktop mode starts and calls Tauri `ManagementClient`.
-- [ ] Verify no-backend or unreachable-backend state shows a readable error.
-- [ ] Verify Dashboard summarizes tools, endpoints, FRP, runtime, suggestions, refresh state, and stale-data warning.
-- [ ] Verify Tools, Config, Endpoints, FRP, Cloudflare, and Settings each support manual refresh without losing unsaved form input.
-- [ ] Verify all high-risk actions require confirmation.
-- [ ] Verify no frontend path stores `password`, `token`, `secret`, Authorization headers, Basic Auth credentials, or secret query strings in localStorage.
-- [ ] Verify all displayed logs and diagnostics are redacted.
-- [ ] Verify server-only operations do not appear as executable desktop actions.
-- [ ] Verify desktop-only operations do not appear as executable server actions.
-- [ ] Update user docs for starting the management UI and understanding capability-gated behavior.
-- [ ] Run final code review with focus on security, capability gating, and regression risk.
-
-**Acceptance:**
-
-- [ ] PRD §19.1 base runtime acceptance passes.
-- [ ] PRD §19.2 Dashboard acceptance passes.
-- [ ] PRD §19.3 Tools acceptance passes.
-- [ ] PRD §19.4 Config acceptance passes.
-- [ ] PRD §19.5 Endpoints acceptance passes.
-- [ ] PRD §19.6 FRP acceptance passes.
-- [ ] PRD §19.7 Security acceptance passes.
-
-**Verification:**
-
-- [ ] Run: `bun test`
-- [ ] Run: `bun run typecheck`
-- [ ] Run: `bun run build:ui`
 - [ ] Run: `bun run build`
 - [ ] Run: `bun run lint` if the script remains available.
 - [ ] Run: `bun run smoke` if the environment supports the smoke target.
