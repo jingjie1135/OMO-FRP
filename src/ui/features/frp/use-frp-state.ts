@@ -4,6 +4,7 @@ import type { FrpConfigRequest, FrpFailureReason, FrpStatus, JobResult } from ".
 import type { FrpClientConfig, FrpServerConfig, PublicEndpoint, RuntimeInfo, ToolInstance } from "../../../core/app-config/types"
 import type { ActionError, ActionStatus } from "../../app/action-runner"
 import { ActionRunner } from "../../app/action-runner"
+import { redactSensitiveText } from "../../../shared/redact-sensitive-text"
 
 export interface FrpValidationResult {
   ok: boolean
@@ -76,7 +77,7 @@ export function useFrpState(client: ManagementClient, runner?: ActionRunner, ini
         setError(undefined)
       }
     } catch (error: unknown) {
-      if (mounted.current) setError(getErrorMessage(error, "Failed to fetch FRP state"))
+      if (mounted.current) setError(redactSensitiveText(getErrorMessage(error, "Failed to fetch FRP state")))
     } finally {
       if (mounted.current) setLoading(false)
     }
