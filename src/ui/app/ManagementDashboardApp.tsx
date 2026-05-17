@@ -96,8 +96,8 @@ function DashboardLoadingState() {
 function DashboardErrorState({ message, onRetry }: { message: string; onRetry(): Promise<void> }) {
   return (
     <section className="px-8 pt-8" aria-label="主控台错误状态">
-      <div className="flex items-center justify-between rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-800">
-        <span>{message}</span>
+      <div className="flex items-center justify-between rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-800" role="alert">
+        <span>Management backend is unavailable: {message}</span>
         <button type="button" onClick={() => void onRetry()} className="rounded-md border border-red-200 bg-white px-3 py-1 text-xs font-medium text-red-700">
           重试
         </button>

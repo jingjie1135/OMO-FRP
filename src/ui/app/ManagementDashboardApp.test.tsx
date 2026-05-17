@@ -216,9 +216,11 @@ describe("ManagementDashboardApp", () => {
   })
 
   it("shows an initial load failure with retry affordance", async () => {
-    const container = await renderApp(createClient([new Error("api unavailable")]))
+    const container = await renderApp(createClient([new Error("api unavailable Authorization: Token raw-dashboard-token")]))
 
     expect(container.textContent).toContain("api unavailable")
+    expect(container.textContent).toContain("Authorization: Token [REDACTED]")
+    expect(container.textContent).not.toContain("raw-dashboard-token")
     expect(container.textContent).toContain("重试")
   })
 
