@@ -101,3 +101,41 @@ describe("local management runtime endpoints", () => {
     expect((await runtime.listEndpoints())[0]?.status).toBe("active")
   })
 })
+
+describe("local management runtime cloudflare tunnel", () => {
+  it("blocks tunnel start when no cloudflare endpoint reports OpenCode password protection", async () => {
+    const runtime = createLocalManagementRuntime({
+      capabilities: SERVER_CAPABILITIES,
+      defaultConfigDirectory: "/tmp/config",
+      frpStatusMode: "server",
+      config: createConfig({
+        toolInstances: [
+          runningOpenCode,
+          {
+            id: "cloudflared-server",
+            kind: "cloudflared",
+            displayName: "cloudflared",
+            hostType: "server",
+            installState: "installed",
+            binaryPath: "cloudflared",
+            defaultPort: 0,
+            status: "stopped",
+          },
+        ],
+        publicEndpoints: [
+          {
+            ...endpoint,
+            id: "cloudflare-route",
+            targetType: "cloudflare",
+            authMode: "basic-auth",
+          },
+        ],
+      }),
+    })
+
+    const result = await runtime.startCloudflareTunnel({ mode: "quick", localHost: "127.0.0.1", localPort: 4096 })
+
+    expect(result.status).toBe("failed")
+    expect(result.message).toContain("OpenCode password protection must be configured")
+  })
+})

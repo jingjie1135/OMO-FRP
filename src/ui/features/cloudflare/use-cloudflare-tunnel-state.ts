@@ -196,6 +196,9 @@ export function validateCloudflareTunnelStart(config: CloudflareTunnelConfigRequ
     const opencode = findTool(runtimeInfo, "opencode")
     if (opencode?.status !== "running") issues.push("OpenCode must be running before cloudflared starts.")
     if (!opencodePortReachable(opencode, config.localPort)) issues.push("Local OpenCode port must match a reachable configured port.")
+    if (!hasProtectedCloudflareEndpoint(runtimeInfo, config.localPort)) {
+      issues.push("OpenCode password protection must be configured on the Cloudflare endpoint before start.")
+    }
     const cloudflared = findTool(runtimeInfo, "cloudflared")
     if (!cloudflared || cloudflared.installState === "missing" || !cloudflared.binaryPath) issues.push("cloudflared binary must be installed before start.")
   }
@@ -292,6 +295,20 @@ function findTool(runtimeInfo: RuntimeInfo, kind: ToolInstance["kind"]): ToolIns
 function opencodePortReachable(tool: ToolInstance | undefined, localPort: number): boolean {
   if (!tool || tool.status !== "running") return false
   return tool.currentPort === localPort || tool.defaultPort === localPort
+}
+
+function hasProtectedCloudflareEndpoint(runtimeInfo: RuntimeInfo, localPort: number): boolean {
+  const targetTool = runtimeInfo.config.toolInstances.find((tool) => tool.kind === "opencode" && (tool.currentPort === localPort || tool.defaultPort === localPort))
+  if (!targetTool) {
+    return false
+  }
+
+  return runtimeInfo.config.publicEndpoints.some(
+    (endpoint) =>
+      endpoint.targetType === "cloudflare"
+      && endpoint.targetToolInstanceId === targetTool.id
+      && (endpoint.authMode === "opencode-password" || endpoint.authMode === "both"),
+  )
 }
 
 function getErrorMessage(error: unknown, fallback: string): string {

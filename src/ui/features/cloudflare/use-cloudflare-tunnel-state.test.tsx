@@ -415,6 +415,33 @@ describe("useCloudflareTunnelState", () => {
     expect(fake.calls.startCloudflareTunnel).toEqual([])
   })
 
+  it("blocks start when no Cloudflare endpoint reports OpenCode password protection", async () => {
+    const fake = createFakeClient()
+    fake.setRuntimeInfo({
+      ...runtimeInfo,
+      config: {
+        ...runtimeInfo.config,
+        publicEndpoints: [
+          {
+            ...cloudflareEndpoint,
+            authMode: "basic-auth",
+          },
+        ],
+      },
+    })
+    const probe = await renderCloudflareState(fake.client)
+
+    let message = ""
+    await act(async () => {
+      await probe.current().startTunnel().catch((error: unknown) => {
+        message = error instanceof Error ? error.message : String(error)
+      })
+    })
+
+    expect(message).toContain("OpenCode password protection must be configured")
+    expect(fake.calls.startCloudflareTunnel).toEqual([])
+  })
+
   it("retries a failed named tunnel step and preserves actionable guidance", async () => {
     const fake = createFakeClient({ ...quickStatus, mode: "named", failureReason: "dns_route_failed", suggestion: "Check Cloudflare DNS permissions." }, namedPlan)
     const probe = await renderCloudflareState(fake.client)
