@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it } from "bun:test"
 import { act } from "react"
 import { createRoot, type Root } from "react-dom/client"
 import type { ManagementClient } from "../../../management-api/client"
+import type { Diagnostics, FrpStatus, JobResult, RuntimeInfo } from "../../../management-api/types"
 import type { DashboardViewModel, LoadDashboardViewModel } from "./dashboard-view-model"
 import { useDashboardState } from "./use-dashboard-state"
 
@@ -51,6 +52,25 @@ function createDashboard(message: string): DashboardViewModel {
 
 function createClient(results: Array<DashboardViewModel | Error>): ManagementClient {
   let callIndex = 0
+  const successJob: JobResult = { jobId: "settings", status: "succeeded", message: "ok" }
+
+  const getCurrentRuntimeInfo = (): RuntimeInfo => {
+    const result = results[Math.min(callIndex, results.length - 1)]
+    if (result instanceof Error) {
+      return createDashboard("fallback").runtimeInfo
+    }
+    return result.runtimeInfo
+  }
+
+  const getCurrentFrpStatus = (): FrpStatus => {
+    const result = results[Math.min(callIndex, results.length - 1)]
+    if (result instanceof Error) {
+      return { mode: "server", running: false, message: "FRP server stopped." }
+    }
+    return result.frpStatus
+  }
+
+  const getCurrentDiagnostics = (): Diagnostics => ({ runtime: getCurrentRuntimeInfo(), tools: [], endpoints: [], frp: getCurrentFrpStatus(), jobs: [], redactedLogs: [] })
 
   return {
     async getRuntimeInfo() {
@@ -119,6 +139,27 @@ function createClient(results: Array<DashboardViewModel | Error>): ManagementCli
     async stopFrp() {
       return { jobId: "stop-frp", status: "succeeded", message: "stopped" }
     },
+    async getCloudflareTunnelStatus() {
+      return { mode: "quick", running: false, message: "Cloudflare Tunnel stopped" }
+    },
+    async saveCloudflareTunnelConfig() {},
+    async createCloudflareTunnelPlan() {
+      return { mode: "quick", localUrl: "http://127.0.0.1:4096", commandSummary: [], cloudflaredDetected: false, diagnostics: [], securityNotes: [], steps: [] }
+    },
+    async startCloudflareTunnel() {
+      return { jobId: "start-cloudflare", status: "succeeded", message: "started" }
+    },
+    async stopCloudflareTunnel() {
+      return { jobId: "stop-cloudflare", status: "succeeded", message: "stopped" }
+    },
+    async retryCloudflareTunnelStep() {
+      return { jobId: "retry-cloudflare", status: "succeeded", message: "ok" }
+    },
+    async getSecurityChecks() { return [] },
+    async getBackupSummary() { return { count: 0, backupDirectory: "", failureRecords: [], canManualBackup: false, canCleanup: false } },
+    async runManualBackup() { return successJob },
+    async cleanupOldBackups() { return successJob },
+    async getDiagnostics() { return getCurrentDiagnostics() },
   }
 }
 

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "bun:test"
 import type { ManagementClient } from "../../../management-api/client"
-import type { FrpStatus, JobResult, LogLine, RuntimeInfo } from "../../../management-api/types"
+import type { Diagnostics, FrpStatus, JobResult, LogLine, RuntimeInfo } from "../../../management-api/types"
 import { loadDashboardViewModel } from "./dashboard-view-model"
 
 const runtimeInfo: RuntimeInfo = {
@@ -58,6 +58,7 @@ describe("loadDashboardViewModel", () => {
 
 function createClient(calls: string[]): ManagementClient {
   const job: JobResult = { jobId: "noop", status: "succeeded", message: "ok" }
+  const diagnostics: Diagnostics = { runtime: runtimeInfo, tools: [], endpoints: [], frp: frpStatus, jobs: [], redactedLogs: [] }
 
   return {
     async getRuntimeInfo() {
@@ -122,5 +123,26 @@ function createClient(calls: string[]): ManagementClient {
     async stopFrp() {
       return job
     },
+    async getCloudflareTunnelStatus() {
+      return { mode: "quick", running: false, message: "Cloudflare Tunnel stopped" }
+    },
+    async saveCloudflareTunnelConfig() {},
+    async createCloudflareTunnelPlan() {
+      return { mode: "quick", localUrl: "http://127.0.0.1:4096", commandSummary: [], cloudflaredDetected: false, diagnostics: [], securityNotes: [], steps: [] }
+    },
+    async startCloudflareTunnel() {
+      return job
+    },
+    async stopCloudflareTunnel() {
+      return job
+    },
+    async retryCloudflareTunnelStep() {
+      return { jobId: "retry-cloudflare", status: "succeeded", message: "ok" }
+    },
+    async getSecurityChecks() { return [] },
+    async getBackupSummary() { return { count: 0, backupDirectory: "", failureRecords: [], canManualBackup: false, canCleanup: false } },
+    async runManualBackup() { return job },
+    async cleanupOldBackups() { return job },
+    async getDiagnostics() { return diagnostics },
   }
 }
