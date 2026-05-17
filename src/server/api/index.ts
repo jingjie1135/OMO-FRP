@@ -1,5 +1,5 @@
 import type { PublicEndpoint } from "../../core/app-config/types"
-import type { ConfigTarget, FrpConfigRequest, InstallToolRequest } from "../../management-api/types"
+import type { CloudflareTunnelConfigRequest, CloudflareTunnelStepId, ConfigTarget, FrpConfigRequest, InstallToolRequest } from "../../management-api/types"
 import { createServerRuntimeAdapter, type ServerRuntimeAdapter } from "../runtime-adapter"
 
 export interface ServerApi {
@@ -124,7 +124,54 @@ export function createServerApi(options: ServerApiOptions = {}): ServerApi {
         return jsonResponse(await adapter.stopFrp())
       }
 
+      if (path === "/api/cloudflare-tunnel/status" && method === "GET") {
+        return jsonResponse(await adapter.getCloudflareTunnelStatus())
+      }
+
+      if (path === "/api/cloudflare-tunnel/config" && method === "POST") {
+        await adapter.saveCloudflareTunnelConfig(body as CloudflareTunnelConfigRequest)
+        return jsonResponse({ ok: true })
+      }
+
+      if (path === "/api/cloudflare-tunnel/plan" && method === "POST") {
+        return jsonResponse(await adapter.createCloudflareTunnelPlan(body as CloudflareTunnelConfigRequest))
+      }
+
+      if (path === "/api/cloudflare-tunnel/start" && method === "POST") {
+        return jsonResponse(await adapter.startCloudflareTunnel(body as CloudflareTunnelConfigRequest))
+      }
+
+      if (path === "/api/cloudflare-tunnel/stop" && method === "POST") {
+        return jsonResponse(await adapter.stopCloudflareTunnel())
+      }
+
+      if (path === "/api/cloudflare-tunnel/retry-step" && method === "POST") {
+        const payload = body as { stepId: CloudflareTunnelStepId }
+        return jsonResponse(await adapter.retryCloudflareTunnelStep(payload.stepId))
+      }
+
+      if (path === "/api/settings/security-checks" && method === "GET") {
+        return jsonResponse(await adapter.getSecurityChecks())
+      }
+
+      if (path === "/api/settings/backup-summary" && method === "GET") {
+        return jsonResponse(await adapter.getBackupSummary())
+      }
+
+      if (path === "/api/settings/backups/manual" && method === "POST") {
+        return jsonResponse(await adapter.runManualBackup())
+      }
+
+      if (path === "/api/settings/backups/cleanup" && method === "POST") {
+        return jsonResponse(await adapter.cleanupOldBackups())
+      }
+
+      if (path === "/api/settings/diagnostics" && method === "GET") {
+        return jsonResponse(await adapter.getDiagnostics())
+      }
+
       return jsonResponse({ error: "Not found" }, 404)
+
     },
   }
 }

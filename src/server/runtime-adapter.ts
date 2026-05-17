@@ -4,6 +4,10 @@ import type {
   ConfigDocument,
   ConfigPreset,
   ConfigTarget,
+  CloudflareTunnelConfigRequest,
+  CloudflareTunnelPlan,
+  CloudflareTunnelStatus,
+  CloudflareTunnelStepId,
   ConfigValidationResult,
   FrpConfigRequest,
   FrpStatus,
@@ -12,6 +16,9 @@ import type {
   LogLine,
   ToolDetection,
   ToolInstance,
+  SecurityCheck,
+  BackupSummary,
+  Diagnostics,
 } from "../management-api/types"
 import { createLocalManagementRuntime } from "../management-api/local-management-runtime"
 
@@ -39,7 +46,19 @@ export interface ServerRuntimeAdapter {
   saveFrpConfig(config: FrpConfigRequest): Promise<void>
   startFrp(): Promise<JobResult>
   stopFrp(): Promise<JobResult>
+  getCloudflareTunnelStatus(): Promise<CloudflareTunnelStatus>
+  saveCloudflareTunnelConfig(config: CloudflareTunnelConfigRequest): Promise<void>
+  createCloudflareTunnelPlan(config: CloudflareTunnelConfigRequest): Promise<CloudflareTunnelPlan>
+  startCloudflareTunnel(config: CloudflareTunnelConfigRequest): Promise<JobResult>
+  stopCloudflareTunnel(): Promise<JobResult>
+  retryCloudflareTunnelStep(stepId: CloudflareTunnelStepId): Promise<JobResult>
+  getSecurityChecks(): Promise<SecurityCheck[]>
+  getBackupSummary(): Promise<BackupSummary>
+  runManualBackup(): Promise<JobResult>
+  cleanupOldBackups(): Promise<JobResult>
+  getDiagnostics(): Promise<Diagnostics>
 }
+
 
 export function createServerRuntimeAdapter(config: AppConfig = createEmptyServerConfig()): ServerRuntimeAdapter {
   return createLocalManagementRuntime({

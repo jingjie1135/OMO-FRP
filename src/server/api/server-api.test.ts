@@ -50,6 +50,30 @@ describe("server api", () => {
     expect(frpStart.status).toBe("succeeded")
   })
 
+  it("supports Cloudflare Tunnel planning and lifecycle routes", async () => {
+    const api = createServerApi({ sessionToken: "session-secret" })
+    const config = { mode: "quick", localHost: "127.0.0.1", localPort: 4096 }
+
+    const statusResponse = await api.request("/api/cloudflare-tunnel/status", authenticated())
+    const status = await statusResponse.json()
+    const saveResponse = await api.request("/api/cloudflare-tunnel/config", postJson(config))
+    const planResponse = await api.request("/api/cloudflare-tunnel/plan", postJson(config))
+    const plan = await planResponse.json()
+    const start = await (await api.request("/api/cloudflare-tunnel/start", postJson(config))).json()
+    const stop = await (await api.request("/api/cloudflare-tunnel/stop", postJson(undefined))).json()
+    const retry = await (await api.request("/api/cloudflare-tunnel/retry-step", postJson({ stepId: "configure_dns" }))).json()
+
+    expect(statusResponse.status).toBe(200)
+    expect(status).toMatchObject({ mode: "quick", running: false })
+    expect(saveResponse.status).toBe(200)
+    expect(planResponse.status).toBe(200)
+    expect(plan).toMatchObject({ mode: "quick", localUrl: "http://127.0.0.1:4096" })
+    expect(Array.isArray(plan.commandSummary)).toBe(true)
+    expect(start.jobId).toContain("start-cloudflare")
+    expect(stop.status).toBe("succeeded")
+    expect(retry.jobId).toContain("retry-cloudflare")
+  })
+
   it("serves tool logs through the HTTP API", async () => {
     const api = createServerApi({ sessionToken: "session-secret" })
 
@@ -62,6 +86,44 @@ describe("server api", () => {
     expect(logsResponse.status).toBe(200)
     expect(Array.isArray(logs)).toBe(true)
     expect(logs.some((line: { message?: string }) => line.message?.includes("started"))).toBe(true)
+  })
+
+  it("supports settings, security and backup summary routes", async () => {
+    const api = createServerApi({ sessionToken: "session-secret" })
+
+    const security = await api.request("/api/settings/security-checks", authenticated())
+    const backup = await api.request("/api/settings/backup-summary", authenticated())
+    const manualBackup = await api.request("/api/settings/backups/manual", postJson(undefined))
+    const cleanup = await api.request("/api/settings/backups/cleanup", postJson(undefined))
+    const diagnostics = await api.request("/api/settings/diagnostics", authenticated())
+
+    expect(security.status).toBe(200)
+    expect(backup.status).toBe(200)
+    expect(manualBackup.status).toBe(200)
+    expect(cleanup.status).toBe(200)
+    expect(diagnostics.status).toBe(200)
+  })
+
+  it("redacts direct settings diagnostics API responses", async () => {
+    const api = createServerApi({ sessionToken: "session-secret" })
+
+    await api.request("/api/tools/install", postJson({ kind: "opencode" }))
+    await api.request("/api/tools/install", postJson({ kind: "cloudflared" }))
+    await api.request("/api/tools/opencode-server/start", postJson(undefined))
+    await api.request("/api/endpoints", postJson({ id: "secret-route", name: "Secret Route", domain: "token.example.com?token=SECRET_QUERY", protocol: "https", targetType: "server-local", targetToolInstanceId: "opencode-server", authMode: "opencode-password", status: "disabled" }))
+    await api.request("/api/config/save", postJson({ target: { toolInstanceId: "opencode-server", kind: "opencode", path: "/tmp/opencode.json" }, content: "{\"token\":\"SECRET_JSON\",\"password\":\"SECRET_PASSWORD\"}" }))
+    await api.request("/api/cloudflare-tunnel/config", postJson({ mode: "quick", localHost: "127.0.0.1", localPort: 4096 }))
+    await api.request("/api/cloudflare-tunnel/start", postJson({ mode: "quick", localHost: "token.example.com?token=SECRET_QUERY", localPort: 4096 }))
+
+    const response = await api.request("/api/settings/diagnostics", authenticated())
+    const bodyText = await response.text()
+
+    expect(response.status).toBe(200)
+    expect(bodyText).not.toContain("SECRET_QUERY")
+    expect(bodyText).not.toContain("SECRET_JSON")
+    expect(bodyText).not.toContain("SECRET_PASSWORD")
+    expect(bodyText).not.toContain("OPENCODE_SERVER_PASSWORD=SECRET")
+    expect(bodyText).toContain("[REDACTED]")
   })
 
   it("requires an administrator session for management endpoints", async () => {
