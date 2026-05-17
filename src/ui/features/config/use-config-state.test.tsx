@@ -107,6 +107,27 @@ function createMockClient(): MockConfigClientControls {
     async stopFrp() {
       return successJob
     },
+    async getCloudflareTunnelStatus() {
+      return { mode: "quick", running: false, message: "Cloudflare Tunnel stopped" }
+    },
+    async saveCloudflareTunnelConfig() {},
+    async createCloudflareTunnelPlan() {
+      return { mode: "quick", localUrl: "http://127.0.0.1:4096", commandSummary: [], cloudflaredDetected: false, diagnostics: [], securityNotes: [], steps: [] }
+    },
+    async startCloudflareTunnel() {
+      return successJob
+    },
+    async stopCloudflareTunnel() {
+      return successJob
+    },
+    async retryCloudflareTunnelStep() {
+      return { jobId: "retry-cloudflare", status: "succeeded", message: "ok" }
+    },
+    async getSecurityChecks() { return [] },
+    async getBackupSummary() { return { count: 0, backupDirectory: "", failureRecords: [], canManualBackup: false, canCleanup: false } },
+    async runManualBackup() { return successJob },
+    async cleanupOldBackups() { return successJob },
+    async getDiagnostics() { return { runtime: runtimeInfo, tools: [], endpoints: [], frp: { mode: "server", running: false, message: "FRP server stopped." }, jobs: [], redactedLogs: [] } },
   }
 
   return {
