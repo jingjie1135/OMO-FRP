@@ -14,6 +14,7 @@ export interface RuntimeCapabilities {
   mode: RuntimeMode
   canManageFrpServer: boolean
   canManageFrpClient: boolean
+  canManageCloudflareTunnel?: boolean
   canInstallServerServices: boolean
   canAccessLocalFilesystem: boolean
   canManageSystemd: boolean
@@ -24,6 +25,7 @@ export const SERVER_CAPABILITIES: RuntimeCapabilities = {
   mode: "server",
   canManageFrpServer: true,
   canManageFrpClient: false,
+  canManageCloudflareTunnel: true,
   canInstallServerServices: true,
   canAccessLocalFilesystem: true,
   canManageSystemd: true,
@@ -34,6 +36,7 @@ export const DESKTOP_CAPABILITIES: RuntimeCapabilities = {
   mode: "desktop",
   canManageFrpServer: false,
   canManageFrpClient: true,
+  canManageCloudflareTunnel: true,
   canInstallServerServices: false,
   canAccessLocalFilesystem: true,
   canManageSystemd: false,

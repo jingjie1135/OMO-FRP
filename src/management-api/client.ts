@@ -3,6 +3,10 @@ import type {
   ConfigDocument,
   ConfigPreset,
   ConfigTarget,
+  CloudflareTunnelConfigRequest,
+  CloudflareTunnelPlan,
+  CloudflareTunnelStatus,
+  CloudflareTunnelStepId,
   ConfigValidationResult,
   FrpConfigRequest,
   FrpStatus,
@@ -13,6 +17,9 @@ import type {
   RuntimeInfo,
   ToolDetection,
   ToolInstance,
+  SecurityCheck,
+  BackupSummary,
+  Diagnostics,
 } from "./types"
 
 export interface ManagementClient {
@@ -42,4 +49,25 @@ export interface ManagementClient {
   saveFrpConfig(config: FrpConfigRequest): Promise<void>
   startFrp(): Promise<JobResult>
   stopFrp(): Promise<JobResult>
+
+  getCloudflareTunnelStatus(): Promise<CloudflareTunnelStatus>
+  saveCloudflareTunnelConfig(config: CloudflareTunnelConfigRequest): Promise<void>
+  createCloudflareTunnelPlan(config: CloudflareTunnelConfigRequest): Promise<CloudflareTunnelPlan>
+  startCloudflareTunnel(config: CloudflareTunnelConfigRequest): Promise<JobResult>
+  stopCloudflareTunnel(): Promise<JobResult>
+  retryCloudflareTunnelStep(stepId: CloudflareTunnelStepId): Promise<JobResult>
+
+  getSecurityChecks?(): Promise<SecurityCheck[]>
+  getBackupSummary?(): Promise<BackupSummary>
+  runManualBackup?(): Promise<JobResult>
+  cleanupOldBackups?(): Promise<JobResult>
+  getDiagnostics?(): Promise<Diagnostics>
+}
+
+export interface SettingsManagementClient extends ManagementClient {
+  getSecurityChecks(): Promise<SecurityCheck[]>
+  getBackupSummary(): Promise<BackupSummary>
+  runManualBackup(): Promise<JobResult>
+  cleanupOldBackups(): Promise<JobResult>
+  getDiagnostics(): Promise<Diagnostics>
 }

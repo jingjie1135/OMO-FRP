@@ -111,4 +111,102 @@ export interface FrpStatus {
 
 export type FrpConfigRequest = FrpServerConfig | FrpClientConfig
 
+export type CloudflareTunnelMode = "quick" | "named"
+
+export type CloudflareTunnelStepId =
+  | "login"
+  | "create_tunnel"
+  | "configure_dns"
+  | "write_config"
+  | "start_tunnel"
+  | "verify_public_access"
+
+export type CloudflareTunnelStepStatus = "idle" | "pending" | "succeeded" | "failed"
+
+export type CloudflareTunnelFailureReason =
+  | "cloudflared_missing"
+  | "opencode_not_running"
+  | "password_missing"
+  | "login_required"
+  | "tunnel_create_failed"
+  | "dns_route_failed"
+  | "config_write_failed"
+  | "public_access_failed"
+  | "timeout"
+  | "unknown"
+
+export interface CloudflareTunnelConfigRequest {
+  mode: CloudflareTunnelMode
+  localHost: string
+  localPort: number
+  tunnelName?: string
+  hostname?: string
+  dnsRoute?: string
+}
+
+export interface CloudflareTunnelDiagnostic {
+  code: string
+  severity: "error" | "warning" | "info"
+  message: string
+  fix: string
+}
+
+export interface CloudflareTunnelStep {
+  id: CloudflareTunnelStepId
+  label: string
+  status: CloudflareTunnelStepStatus
+  message?: string
+  retryable?: boolean
+}
+
+export interface CloudflareTunnelPlan {
+  mode: CloudflareTunnelMode
+  localUrl: string
+  publicUrl?: string
+  tunnelName?: string
+  hostname?: string
+  dnsRoute?: string
+  commandSummary: string[]
+  cloudflaredDetected: boolean
+  diagnostics: CloudflareTunnelDiagnostic[]
+  securityNotes: string[]
+  steps: CloudflareTunnelStep[]
+}
+
+export interface CloudflareTunnelStatus {
+  mode: CloudflareTunnelMode | "unavailable"
+  running: boolean
+  message: string
+  publicUrl?: string
+  currentStep?: CloudflareTunnelStepId
+  failureReason?: CloudflareTunnelFailureReason
+  suggestion?: string
+}
+
+export interface SecurityCheck {
+  id: string
+  label: string
+  status: "pass" | "warn" | "fail"
+  message: string
+  fix?: string
+}
+
+export interface BackupSummary {
+  count: number
+  lastBackupTime?: string
+  backupDirectory: string
+  failureRecords: string[]
+  canManualBackup: boolean
+  canCleanup: boolean
+}
+
+export interface Diagnostics {
+  runtime: RuntimeInfo
+  tools: ToolDetection[]
+  endpoints: PublicEndpoint[]
+  frp: FrpStatus
+  jobs: JobResult[]
+  redactedLogs: LogLine[]
+}
+
 export type { ConfigPreset, PublicEndpoint, ToolInstance }
