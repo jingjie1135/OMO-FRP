@@ -1,5 +1,6 @@
 import { Globe, LayoutDashboard, RefreshCw, Settings, Shield, TerminalSquare, Wrench } from "lucide-react"
 import type { ManagementClient } from "../../management-api/client"
+import type { RuntimeInfo } from "../../management-api/types"
 import { DashboardView } from "../features/dashboard/DashboardView"
 import { useDashboardState } from "../features/dashboard/use-dashboard-state"
 
@@ -9,6 +10,7 @@ const navigationItems = [
   { label: "公网入口", icon: Globe, active: false },
   { label: "配置与备份", icon: Settings, active: false },
   { label: "FRP 穿透", icon: Shield, active: false },
+  { label: "Cloudflare Tunnel", icon: Globe, active: false, requiresCloudflareTunnel: true },
   { label: "日志", icon: TerminalSquare, active: false },
 ]
 
@@ -16,6 +18,7 @@ export function ManagementDashboardApp({ client }: { client: ManagementClient })
   const dashboardState = useDashboardState(client)
   const runtimeLabel = dashboardState.dashboard?.runtimeInfo.capabilities.mode === "desktop" ? "桌面模式" : "服务器模式"
   const lastUpdatedLabel = dashboardState.lastUpdated ? dashboardState.lastUpdated.toLocaleTimeString("zh-CN", { hour12: false }) : "尚未同步"
+  const visibleNavigationItems = getVisibleNavigationItems(dashboardState.dashboard?.runtimeInfo)
 
   return (
     <div className="flex min-h-screen bg-slate-50 text-slate-900">
@@ -26,7 +29,7 @@ export function ManagementDashboardApp({ client }: { client: ManagementClient })
         </div>
         <nav className="flex-1 px-3 py-4" aria-label="管理导航">
           <ul className="space-y-1">
-            {navigationItems.map((item) => {
+            {visibleNavigationItems.map((item) => {
               const Icon = item.icon
               return (
                 <li key={item.label}>
@@ -76,6 +79,10 @@ export function ManagementDashboardApp({ client }: { client: ManagementClient })
       </div>
     </div>
   )
+}
+
+function getVisibleNavigationItems(runtimeInfo: RuntimeInfo | undefined) {
+  return navigationItems.filter((item) => !item.requiresCloudflareTunnel || runtimeInfo?.capabilities.canManageCloudflareTunnel)
 }
 
 function DashboardLoadingState() {
