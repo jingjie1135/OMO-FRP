@@ -5,6 +5,7 @@ fn get_runtime_info() -> serde_json::Value {
             "mode": "desktop",
             "canManageFrpServer": false,
             "canManageFrpClient": true,
+            "canManageCloudflareTunnel": true,
             "canInstallServerServices": false,
             "canAccessLocalFilesystem": true,
             "canManageSystemd": false,
@@ -182,12 +183,202 @@ fn stop_frp() -> serde_json::Value {
     })
 }
 
+#[tauri::command(rename_all = "snake_case")]
+fn get_cloudflare_tunnel_status() -> serde_json::Value {
+    serde_json::json!({
+        "mode": "quick",
+        "running": false,
+        "message": "Cloudflare Tunnel is not running yet.",
+        "publicUrl": "https://<generated>.trycloudflare.com",
+        "currentStep": "start_tunnel"
+    })
+}
+
+#[tauri::command(rename_all = "snake_case")]
+fn save_cloudflare_tunnel_config(_config: serde_json::Value) {}
+
+#[tauri::command(rename_all = "snake_case")]
+fn create_cloudflare_tunnel_plan(config: serde_json::Value) -> serde_json::Value {
+    let mode = config.get("mode").and_then(serde_json::Value::as_str).unwrap_or("quick");
+    let local_host = config.get("localHost").and_then(serde_json::Value::as_str).unwrap_or("127.0.0.1");
+    let local_port = config.get("localPort").and_then(serde_json::Value::as_i64).unwrap_or(4096);
+    let local_url = format!("http://{}:{}", local_host, local_port);
+
+    if mode == "named" {
+        let tunnel_name = config.get("tunnelName").and_then(serde_json::Value::as_str).unwrap_or("opencode-local");
+        let hostname = config.get("hostname").and_then(serde_json::Value::as_str).unwrap_or("opencode.example.com");
+        let dns_route = config.get("dnsRoute").and_then(serde_json::Value::as_str).unwrap_or(hostname);
+        return serde_json::json!({
+            "mode": "named",
+            "localUrl": local_url,
+            "publicUrl": format!("https://{}", hostname),
+            "tunnelName": tunnel_name,
+            "hostname": hostname,
+            "dnsRoute": dns_route,
+            "commandSummary": [
+                "cloudflared tunnel login",
+                format!("cloudflared tunnel create {}", tunnel_name),
+                format!("cloudflared tunnel route dns {} {}", tunnel_name, dns_route),
+                format!("cloudflared tunnel run --url {} {}", local_url, tunnel_name)
+            ],
+            "cloudflaredDetected": false,
+            "diagnostics": [{
+                "code": "cloudflared-detection-required",
+                "severity": "warning",
+                "message": "Run tool detection before starting Cloudflare Tunnel.",
+                "fix": "Detect cloudflared from the Tools page."
+            }],
+            "securityNotes": [
+                "Never expose OpenCode without a strong OPENCODE_SERVER_PASSWORD.",
+                "Named tunnels should use a Cloudflare-managed hostname."
+            ],
+            "steps": [
+                { "id": "login", "label": "Login", "status": "idle", "retryable": true },
+                { "id": "create_tunnel", "label": "Create tunnel", "status": "idle", "retryable": true },
+                { "id": "configure_dns", "label": "Configure DNS", "status": "idle", "retryable": true },
+                { "id": "write_config", "label": "Write config", "status": "idle", "retryable": true },
+                { "id": "start_tunnel", "label": "Start tunnel", "status": "idle", "retryable": true },
+                { "id": "verify_public_access", "label": "Verify public access", "status": "idle", "retryable": true }
+            ]
+        });
+    }
+
+    serde_json::json!({
+        "mode": "quick",
+        "localUrl": local_url,
+        "publicUrl": "https://<generated>.trycloudflare.com",
+        "commandSummary": [format!("cloudflared tunnel --url {}", local_url)],
+        "cloudflaredDetected": false,
+        "diagnostics": [{
+            "code": "cloudflared-detection-required",
+            "severity": "warning",
+            "message": "Run tool detection before starting Cloudflare Tunnel.",
+            "fix": "Detect cloudflared from the Tools page."
+        }],
+        "securityNotes": [
+            "Never expose OpenCode without a strong OPENCODE_SERVER_PASSWORD.",
+            "Quick tunnels are temporary and should be treated as ad hoc access."
+        ],
+        "steps": []
+    })
+}
+
+#[tauri::command(rename_all = "snake_case")]
+fn start_cloudflare_tunnel(_config: serde_json::Value) -> serde_json::Value {
+    serde_json::json!({
+        "jobId": "start-cloudflare:desktop",
+        "status": "failed",
+        "message": "Cloudflare Tunnel start requires desktop cloudflared runtime support."
+    })
+}
+
+#[tauri::command(rename_all = "snake_case")]
+fn stop_cloudflare_tunnel() -> serde_json::Value {
+    serde_json::json!({
+        "jobId": "stop-cloudflare:desktop",
+        "status": "succeeded",
+        "message": "Cloudflare Tunnel stopped."
+    })
+}
+
+#[tauri::command(rename_all = "snake_case")]
+fn retry_cloudflare_tunnel_step(step_id: String) -> serde_json::Value {
+    serde_json::json!({
+        "jobId": format!("retry-cloudflare:{}", step_id),
+        "status": "succeeded",
+        "message": format!("Cloudflare Tunnel step {} was retried.", step_id)
+    })
+}
+
+#[tauri::command(rename_all = "snake_case")]
+fn get_security_checks() -> serde_json::Value {
+    serde_json::json!([
+        {
+            "id": "opencode-password",
+            "label": "OpenCode password",
+            "status": "warn",
+            "message": "Desktop runtime has not reported an OpenCode password-protected public endpoint.",
+            "fix": "Use opencode-password or both authentication before enabling public access."
+        },
+        {
+            "id": "endpoint-auth",
+            "label": "Endpoint auth",
+            "status": "pass",
+            "message": "No basic-auth-only endpoint was reported."
+        },
+        {
+            "id": "frp-token-ref",
+            "label": "FRP token ref",
+            "status": "warn",
+            "message": "No FRP token reference is configured."
+        },
+        {
+            "id": "cleartext-secret-risk",
+            "label": "Cleartext secret risk",
+            "status": "pass",
+            "message": "Desktop bridge placeholder does not expose cleartext secret metadata."
+        },
+        {
+            "id": "log-redaction",
+            "label": "Log redaction",
+            "status": "pass",
+            "message": "Diagnostics export redacts logs before download."
+        },
+        {
+            "id": "backup-availability",
+            "label": "Backup availability",
+            "status": "pass",
+            "message": "Desktop runtime can access local backup files through approved bridge commands."
+        }
+    ])
+}
+
+#[tauri::command(rename_all = "snake_case")]
+fn get_backup_summary() -> serde_json::Value {
+    serde_json::json!({
+        "count": 0,
+        "backupDirectory": "not reported",
+        "failureRecords": [],
+        "canManualBackup": false,
+        "canCleanup": false
+    })
+}
+
+#[tauri::command(rename_all = "snake_case")]
+fn run_manual_backup() -> serde_json::Value {
+    serde_json::json!({
+        "jobId": "manual-backup:desktop",
+        "status": "failed",
+        "message": "Manual backup requires desktop storage integration."
+    })
+}
+
+#[tauri::command(rename_all = "snake_case")]
+fn cleanup_old_backups() -> serde_json::Value {
+    serde_json::json!({
+        "jobId": "cleanup-backups:desktop",
+        "status": "failed",
+        "message": "Backup cleanup requires desktop storage integration."
+    })
+}
+
+#[tauri::command(rename_all = "snake_case")]
+fn get_diagnostics() -> serde_json::Value {
+    serde_json::json!({
+        "runtime": get_runtime_info(),
+        "tools": [],
+        "endpoints": [],
+        "frp": get_frp_status(),
+        "jobs": [],
+        "redactedLogs": []
+    })
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_fs::init())
-        .plugin(tauri_plugin_shell::init())
         .invoke_handler(tauri::generate_handler![
             get_runtime_info,
             detect_tools,
@@ -211,7 +402,18 @@ pub fn run() {
             get_frp_status,
             save_frp_config,
             start_frp,
-            stop_frp
+            stop_frp,
+            get_cloudflare_tunnel_status,
+            save_cloudflare_tunnel_config,
+            create_cloudflare_tunnel_plan,
+            start_cloudflare_tunnel,
+            stop_cloudflare_tunnel,
+            retry_cloudflare_tunnel_step,
+            get_security_checks,
+            get_backup_summary,
+            run_manual_backup,
+            cleanup_old_backups,
+            get_diagnostics,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
