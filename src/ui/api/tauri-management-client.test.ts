@@ -27,7 +27,7 @@ describe("tauri management client", () => {
           return [{ id: "opencode-desktop", kind: "opencode", status: "stopped" }]
         }
         if (command === "get_tool_logs") {
-          expect(args).toEqual({ instanceId: "opencode-desktop" })
+          expect(args).toEqual({ instance_id: "opencode-desktop" })
           return []
         }
         if (
@@ -37,9 +37,30 @@ describe("tauri management client", () => {
           command === "enable_endpoint" ||
           command === "disable_endpoint" ||
           command === "start_frp" ||
-          command === "stop_frp"
+          command === "stop_frp" ||
+          command === "start_cloudflare_tunnel" ||
+          command === "stop_cloudflare_tunnel" ||
+          command === "retry_cloudflare_tunnel_step"
         ) {
+          if (command === "start_tool") {
+            expect(args).toEqual({ instance_id: "opencode-desktop" })
+          }
+          if (command === "stop_tool") {
+            expect(args).toEqual({ instance_id: "opencode-desktop" })
+          }
+          if (command === "restart_tool") {
+            expect(args).toEqual({ instance_id: "opencode-desktop" })
+          }
+          if (command === "retry_cloudflare_tunnel_step") {
+            expect(args).toEqual({ step_id: "configure_dns" })
+          }
           return { status: "succeeded", message: command, jobId: `${command}-job` }
+        }
+        if (command === "create_cloudflare_tunnel_plan") {
+          return { mode: "quick", localUrl: "http://127.0.0.1:4096", commandSummary: [], cloudflaredDetected: true, diagnostics: [], securityNotes: [], steps: [] }
+        }
+        if (command === "get_cloudflare_tunnel_status") {
+          return { mode: "quick", running: false, message: "Cloudflare Tunnel stopped" }
         }
         return { mode: "client", running: false, message: "frpc stopped" }
       },
@@ -67,6 +88,19 @@ describe("tauri management client", () => {
     expect((await client.getFrpStatus()).mode).toBe("client")
     expect((await client.startFrp()).status).toBe("succeeded")
     expect((await client.stopFrp()).status).toBe("succeeded")
+    await client.saveCloudflareTunnelConfig({ mode: "quick", localHost: "127.0.0.1", localPort: 4096 })
+    expect((await client.createCloudflareTunnelPlan({ mode: "quick", localHost: "127.0.0.1", localPort: 4096 })).mode).toBe("quick")
+    expect((await client.getCloudflareTunnelStatus()).mode).toBe("quick")
+    expect((await client.startCloudflareTunnel({ mode: "quick", localHost: "127.0.0.1", localPort: 4096 })).status).toBe("succeeded")
+    expect((await client.stopCloudflareTunnel()).status).toBe("succeeded")
+    expect((await client.retryCloudflareTunnelStep("configure_dns")).status).toBe("succeeded")
+
+    await client.getSecurityChecks()
+    await client.getBackupSummary()
+    await client.runManualBackup()
+    await client.cleanupOldBackups()
+    await client.getDiagnostics()
+
     expect(commands).toEqual([
       "detect_tools",
       "list_tool_instances",
@@ -80,6 +114,17 @@ describe("tauri management client", () => {
       "get_frp_status",
       "start_frp",
       "stop_frp",
+      "save_cloudflare_tunnel_config",
+      "create_cloudflare_tunnel_plan",
+      "get_cloudflare_tunnel_status",
+      "start_cloudflare_tunnel",
+      "stop_cloudflare_tunnel",
+      "retry_cloudflare_tunnel_step",
+      "get_security_checks",
+      "get_backup_summary",
+      "run_manual_backup",
+      "cleanup_old_backups",
+      "get_diagnostics",
     ])
   })
 })
