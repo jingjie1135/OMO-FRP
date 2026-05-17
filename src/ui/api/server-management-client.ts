@@ -1,5 +1,5 @@
-import type { ManagementClient } from "../../management-api/client"
-import type { ConfigTarget, FrpConfigRequest, InstallToolRequest } from "../../management-api/types"
+import type { SettingsManagementClient } from "../../management-api/client"
+import type { CloudflareTunnelConfigRequest, CloudflareTunnelStepId, ConfigTarget, FrpConfigRequest, InstallToolRequest } from "../../management-api/types"
 
 export interface ServerManagementClientOptions {
   baseUrl: string
@@ -7,15 +7,15 @@ export interface ServerManagementClientOptions {
   sessionToken?: string
 }
 
-export function createServerManagementClient(options: ServerManagementClientOptions): ManagementClient {
+export function createServerManagementClient(options: ServerManagementClientOptions): SettingsManagementClient {
   return {
-    getRuntimeInfo(): Promise<ReturnType<ManagementClient["getRuntimeInfo"]> extends Promise<infer T> ? T : never> {
+    getRuntimeInfo(): Promise<ReturnType<SettingsManagementClient["getRuntimeInfo"]> extends Promise<infer T> ? T : never> {
       return getJson(options, "/api/runtime")
     },
-    detectTools(): Promise<ReturnType<ManagementClient["detectTools"]> extends Promise<infer T> ? T : never> {
+    detectTools(): Promise<ReturnType<SettingsManagementClient["detectTools"]> extends Promise<infer T> ? T : never> {
       return getJson(options, "/api/system/detect")
     },
-    listToolInstances(): Promise<ReturnType<ManagementClient["listToolInstances"]> extends Promise<infer T> ? T : never> {
+    listToolInstances(): Promise<ReturnType<SettingsManagementClient["listToolInstances"]> extends Promise<infer T> ? T : never> {
       return getJson(options, "/api/tools")
     },
     installTool(request: InstallToolRequest) {
@@ -78,8 +78,42 @@ export function createServerManagementClient(options: ServerManagementClientOpti
     stopFrp() {
       return postJson(options, "/api/frp/stop")
     },
+    getCloudflareTunnelStatus() {
+      return getJson(options, "/api/cloudflare-tunnel/status")
+    },
+    saveCloudflareTunnelConfig(config: CloudflareTunnelConfigRequest) {
+      return postVoid(options, "/api/cloudflare-tunnel/config", config)
+    },
+    createCloudflareTunnelPlan(config: CloudflareTunnelConfigRequest) {
+      return postJson(options, "/api/cloudflare-tunnel/plan", config)
+    },
+    startCloudflareTunnel(config: CloudflareTunnelConfigRequest) {
+      return postJson(options, "/api/cloudflare-tunnel/start", config)
+    },
+    stopCloudflareTunnel() {
+      return postJson(options, "/api/cloudflare-tunnel/stop")
+    },
+    retryCloudflareTunnelStep(stepId: CloudflareTunnelStepId) {
+      return postJson(options, "/api/cloudflare-tunnel/retry-step", { stepId })
+    },
+    getSecurityChecks() {
+      return getJson(options, "/api/settings/security-checks")
+    },
+    getBackupSummary() {
+      return getJson(options, "/api/settings/backup-summary")
+    },
+    runManualBackup() {
+      return postJson(options, "/api/settings/backups/manual")
+    },
+    cleanupOldBackups() {
+      return postJson(options, "/api/settings/backups/cleanup")
+    },
+    getDiagnostics() {
+      return getJson(options, "/api/settings/diagnostics")
+    },
   }
 }
+
 
 async function getJson<T>(options: ServerManagementClientOptions, path: string): Promise<T> {
   const response = await options.fetch(`${options.baseUrl}${path}`, { headers: createHeaders(options) })
