@@ -4,6 +4,7 @@ import { createRoot, type Root } from "react-dom/client"
 import type { ManagementClient } from "../../management-api/client"
 import {
   loadConfigPage,
+  loadCloudflareTunnelPage,
   loadDashboardPage,
   loadEndpointsPage,
   loadFrpPage,
@@ -147,8 +148,30 @@ function createClient(): ManagementClient {
     async stopFrp() {
       return { jobId: "stop-frp", status: "succeeded", message: "ok" }
     },
+    async getCloudflareTunnelStatus() {
+      return { mode: "quick", running: false, message: "Cloudflare Tunnel stopped" }
+    },
+    async saveCloudflareTunnelConfig() {},
+    async createCloudflareTunnelPlan() {
+      return { mode: "quick", localUrl: "http://127.0.0.1:4096", publicUrl: "https://<generated>.trycloudflare.com", commandSummary: ["cloudflared tunnel --url http://127.0.0.1:4096"], cloudflaredDetected: false, diagnostics: [], securityNotes: [], steps: [] }
+    },
+    async startCloudflareTunnel() {
+      return { jobId: "start-cloudflare", status: "succeeded", message: "ok" }
+    },
+    async stopCloudflareTunnel() {
+      return { jobId: "stop-cloudflare", status: "succeeded", message: "ok" }
+    },
+    async retryCloudflareTunnelStep() {
+      return { jobId: "retry-cloudflare", status: "succeeded", message: "ok" }
+    },
+    async getSecurityChecks() { return [] },
+    async getBackupSummary() { return { count: 0, backupDirectory: "", failureRecords: [], canManualBackup: false, canCleanup: false } },
+    async runManualBackup() { return { jobId: "manual-backup", status: "succeeded", message: "ok" } },
+    async cleanupOldBackups() { return { jobId: "cleanup-backups", status: "succeeded", message: "ok" } },
+    async getDiagnostics() { return { runtime: await this.getRuntimeInfo(), tools: [], endpoints: await this.listEndpoints(), frp: await this.getFrpStatus(), jobs: [], redactedLogs: [] } },
   }
 }
+
 
 describe("page loaders", () => {
   it("loads all management pages through the management client", async () => {
@@ -179,6 +202,10 @@ describe("page loaders", () => {
     const frp = (await loadFrpPage(client)) as React.ReactElement
     const frpContainer = render(frp)
     expect(frpContainer.textContent).toContain("frp:server")
+
+    const cloudflare = (await loadCloudflareTunnelPage(client)) as React.ReactElement
+    const cloudflareContainer = render(cloudflare)
+    expect(cloudflareContainer.textContent).toContain("cloudflare:quick")
 
     const settings = (await loadSettingsPage(client)) as React.ReactElement
     const settingsContainer = render(settings)

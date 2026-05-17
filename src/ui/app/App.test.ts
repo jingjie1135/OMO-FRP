@@ -79,8 +79,20 @@ function createClient(mode: "server" | "desktop" = "server"): ManagementClient {
     async saveFrpConfig() {},
     async startFrp() { return { jobId: "sf", status: "succeeded", message: "ok" } },
     async stopFrp() { return { jobId: "tf", status: "succeeded", message: "ok" } },
+    async getCloudflareTunnelStatus() { return { mode: "quick", running: false, message: "Cloudflare Tunnel stopped" } },
+    async saveCloudflareTunnelConfig() {},
+    async createCloudflareTunnelPlan() { return { mode: "quick", localUrl: "http://127.0.0.1:4096", commandSummary: [], cloudflaredDetected: false, diagnostics: [], securityNotes: [], steps: [] } },
+    async startCloudflareTunnel() { return { jobId: "sc", status: "succeeded", message: "ok" } },
+    async stopCloudflareTunnel() { return { jobId: "tc", status: "succeeded", message: "ok" } },
+    async retryCloudflareTunnelStep() { return { jobId: "rc", status: "succeeded", message: "ok" } },
+    async getSecurityChecks() { return [] },
+    async getBackupSummary() { return { count: 0, backupDirectory: "", failureRecords: [], canManualBackup: false, canCleanup: false } },
+    async runManualBackup() { return { jobId: "mb", status: "succeeded", message: "ok" } },
+    async cleanupOldBackups() { return { jobId: "cb", status: "succeeded", message: "ok" } },
+    async getDiagnostics() { return { runtime: await this.getRuntimeInfo(), tools: [], endpoints: [], frp: await this.getFrpStatus(), jobs: [], redactedLogs: [] } },
   }
 }
+
 
 describe("management app", () => {
   it("renders the layout and all management sections dynamically", async () => {

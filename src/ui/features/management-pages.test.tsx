@@ -96,6 +96,37 @@ function createToolsPageClient(instances: RuntimeInfo["config"]["toolInstances"]
     async stopFrp() {
       return { jobId: "stop-frp", status: "succeeded", message: "ok" }
     },
+    async getCloudflareTunnelStatus() {
+      return { mode: "quick", running: false, message: "Cloudflare Tunnel stopped" }
+    },
+    async saveCloudflareTunnelConfig() {},
+    async createCloudflareTunnelPlan() {
+      return { mode: "quick", localUrl: "http://127.0.0.1:4096", commandSummary: [], cloudflaredDetected: false, diagnostics: [], securityNotes: [], steps: [] }
+    },
+    async startCloudflareTunnel() {
+      return { jobId: "start-cloudflare", status: "succeeded", message: "ok" }
+    },
+    async stopCloudflareTunnel() {
+      return { jobId: "stop-cloudflare", status: "succeeded", message: "ok" }
+    },
+    async retryCloudflareTunnelStep() {
+      return { jobId: "retry-cloudflare", status: "succeeded", message: "ok" }
+    },
+    async getSecurityChecks() {
+      return []
+    },
+    async getBackupSummary() {
+      return { count: 0, backupDirectory: "", failureRecords: [], canManualBackup: false, canCleanup: false }
+    },
+    async runManualBackup() {
+      return { jobId: "manual-backup", status: "succeeded", message: "ok" }
+    },
+    async cleanupOldBackups() {
+      return { jobId: "cleanup-backups", status: "succeeded", message: "ok" }
+    },
+    async getDiagnostics() {
+      return { runtime: serverInfo, tools: [], endpoints: [], frp: { mode: "server", running: false, message: "FRP server stopped." }, jobs: [], redactedLogs: [] }
+    },
   }
 }
 
@@ -231,6 +262,9 @@ describe("management UI pages", () => {
 
     const settingsContainer = render(<SettingsPage info={serverInfo} />)
     expect(settingsContainer.textContent).toContain("settings:mode=server")
+    expect(settingsContainer.textContent).toContain("same-origin management API")
+    expect(settingsContainer.textContent).not.toContain("Cleanup Old Backups")
+    expect(settingsContainer.querySelector<HTMLAnchorElement>('a[href="/config"]')?.textContent).toContain("Restore Config Flow")
     expect(settingsContainer.querySelector('h2#runtime-heading')).toBeTruthy()
     expect(settingsContainer.querySelector('h2#security-heading')).toBeTruthy()
     expect(settingsContainer.querySelector('h2#backups-heading')).toBeTruthy()
