@@ -40,7 +40,7 @@
 - [x] **Task 7: FRP server/client management loop**
 - [x] **Task 8: Cloudflare Tunnel quick/named flow**
 - [x] **Task 9: Settings, security checks, backup summary, and diagnostics export**
-- [ ] **Task 10: Cross-feature integration, acceptance pass, and release readiness**
+- [x] **Task 10: Cross-feature integration, acceptance pass, and release readiness**
 
 ---
 
@@ -506,17 +506,72 @@
 - [x] Run: `bun run typecheck`
 - [x] Run: `bun run build:ui`
 
-- [ ] Run: `bun run build`
-- [ ] Run: `bun run lint` if the script remains available.
-- [ ] Run: `bun run smoke` if the environment supports the smoke target.
+- [x] Run: `bun run build`
+- [x] Run: `bun run lint` if the script remains available.
+- [x] Run: `bun run smoke` if the environment supports the smoke target.
+
+---
+
+## Task 10: Cross-Feature Integration, Acceptance Pass, and Release Readiness
+
+**Status:** Complete.
+
+**Purpose:** Verify the management UI as one cohesive product across server Web and Tauri desktop boundaries, then document the final release gates.
+
+**Files:**
+
+- Modify: `src/ui/app/App.tsx`
+- Modify: `src/ui/main.tsx`
+- Create: `src/ui/app/management-ui-acceptance.test.tsx`
+- Create: `src/ui/main.test.tsx`
+- Create: `src/shared/redact-sensitive-text.test.ts`
+- Modify: `src/shared/redact-sensitive-text.ts`
+- Modify: `src/ui/features/dashboard/use-dashboard-state.ts`
+- Modify: `src/ui/features/frp/use-frp-state.ts`
+- Modify: `docs/guide/management-ui.md`
+- Modify: `README.md`
+- Modify: `docs/superpowers/plans/2026-05-14-management-ui-frontend-tasks.md`
+
+**Checklist:**
+
+- [x] Add app-level handling for unreachable Management backend so startup failures render an understandable error state instead of throwing raw errors.
+- [x] Add production entry coverage for `src/ui/main.tsx` so real browser/Tauri startup shows the same redacted backend-unavailable state.
+- [x] Add a cross-runtime acceptance suite covering server and desktop shell rendering, capability-driven Cloudflare Tunnel routing, and app-level backend failure handling.
+- [x] Strengthen shared redaction coverage for environment variables, authorization schemes, camelCase secret keys, snake_case secret keys, and JSON-style secret fields.
+- [x] Add release-readiness checks that keep shared UI code inside the `ManagementClient` boundary and prevent direct shell/Tauri/storage access outside runtime client adapters.
+- [x] Update the management UI guide from skeleton-era wording to the completed Dashboard, Tools, Config, Endpoints, FRP, Cloudflare Tunnel, and Settings behavior.
+- [x] Update README verification guidance with UI build, Tauri `cargo check`, and the final acceptance test entry point.
+
+**Acceptance:**
+
+- [x] Frontend startup can report server/desktop runtime mode through the shared shell.
+- [x] Backend connection failures produce a readable error state with redacted error text.
+- [x] Dashboard and FRP state errors redact secret-bearing backend messages before they reach visible UI state.
+- [x] Cloudflare Tunnel navigation and page loading are controlled by `RuntimeCapabilities.canManageCloudflareTunnel`.
+- [x] Shared UI pages remain behind `ManagementClient`; only the browser/runtime client adapters touch Tauri invoke or transport details.
+- [x] Release documentation names the Task 10 acceptance suite and the full quality gate commands.
+
+**Verification:**
+
+- [x] RED observed: `bun test src/ui/app/management-ui-acceptance.test.tsx` failed before implementation on app-level backend error and stale release docs.
+- [x] RED observed after Oracle review: `bun test src/shared/redact-sensitive-text.test.ts src/ui/main.test.tsx src/ui/app/management-ui-acceptance.test.tsx src/ui/features/dashboard/use-dashboard-state.test.tsx src/ui/app/ManagementDashboardApp.test.tsx` failed on missing `bootManagementUi`, incomplete secret redaction, and raw dashboard error display.
+- [x] Run: `bun test src/shared/redact-sensitive-text.test.ts src/ui/main.test.tsx src/ui/app/management-ui-acceptance.test.tsx src/ui/features/dashboard/use-dashboard-state.test.tsx src/ui/app/ManagementDashboardApp.test.tsx src/ui/frontend-shell.test.ts src/ui/features/frp/use-frp-state.test.tsx` → `29 pass / 0 fail / 586 expect() calls`.
+- [x] Run: `bun test src/ui/app/management-ui-acceptance.test.tsx` → `5 pass / 0 fail / 464 expect() calls`.
+- [x] Run: `bun test src/ui/app/App.test.ts src/ui/app/page-loaders.test.ts src/ui/app/ManagementDashboardApp.test.tsx src/ui/features/management-pages.test.tsx src/ui/browser-management-client.test.ts` → `13 pass / 0 fail / 81 expect() calls`.
+- [x] Run: `bun test` → `186 pass / 0 fail / 1198 expect() calls`.
+- [x] Run: `bun run typecheck`.
+- [x] Run: `bun run build:ui`.
+- [x] Run: `bun run build`.
+- [x] Run: `bun run lint`.
+- [x] Run: `bun run smoke`.
+- [x] Run: `cargo check` in `src-tauri`.
+- [x] Run: `git diff --check` → only CRLF conversion warnings, no whitespace errors.
 
 ---
 
 ## Current Recommended Next Phase
 
-Start with **Task 2: Upgrade Feature Skeletons Into Real Interactive React Pages**, then immediately do **Task 3: Shared Async Action, Job, Error, and Refresh Infrastructure**.
-
-Reason: the repository already has runtime contracts, Dashboard state, feature skeleton files, and several domain-specific pages. The next blocking gap is turning the non-Dashboard feature skeletons into real user-operable React pages and giving them a shared action/job/error pattern before adding many write operations.
+All tracked management UI frontend phases are complete. The next step is release/PR review, packaging polish, or a new follow-up plan for post-PRD enhancements.
 
 ---
 

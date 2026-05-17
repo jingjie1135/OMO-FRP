@@ -34,10 +34,29 @@ OpenCode 是第一种工具，后续其他 AI 编程工具通过 `ToolAdapter` �
 
 `oh-my-openagent` 始终作为 OpenCode 插件配置对象管理，而不是平台本体。配置和 preset 应用前必须通过 `StorageAdapter` 创建备份，日志中的 token、password、secret 和 Authorization header 必须脱敏。
 
-## 当前骨架状态
+## 已实现功能域
 
-- `src/core/app-config/` 定义双运行时模型和 capability。
-- `src/management-api/` 定义 UI 调用的 `ManagementClient` 合同。
-- `src/server/api/` 提供服务器 Web 的最小 HTTP API。
-- `src/desktop/` 与 `src-tauri/` 提供桌面运行时骨架。
-- `src/ui/` 提供共享 UI 路由和 FRP server/client 分支骨架。
+- **Dashboard**：展示运行模式、能力矩阵、工具实例数量、公网 endpoint 摘要、FRP 状态、最近日志和下一步风险提示。
+- **Tools**：支持手动检测工具、安装支持的缺失工具、启动/停止/重启工具实例，并按实例查看脱敏日志。
+- **Config**：支持 OpenCode 与 `oh-my-openagent` 配置读取、编辑、前端/后端校验、preset 应用、backup 列表和 restore 入口。
+- **Endpoints**：支持 endpoint 列表、创建/编辑、默认 disabled、安全检查后启用、停用保留配置，以及诊断建议。
+- **FRP**：服务器模式只显示 FRP server 操作；桌面模式只显示 FRP client 操作；不可用能力会阻止操作并说明原因。
+- **Cloudflare Tunnel**：在运行时声明 `canManageCloudflareTunnel` 时显示 quick / named tunnel 流程，通过 `ManagementClient` 请求运行时规划和执行。
+- **Settings**：展示运行时信息、安全检查、backup 摘要、手动 backup、旧 backup 清理开关，以及红acted diagnostics 导出。
+
+## Task 10 发布就绪验收
+
+发布前需要完成以下本地验证，确保 UI 作为一个跨运行时产品整体可用：
+
+```bash
+bun test src/ui/app/management-ui-acceptance.test.tsx
+bun test
+bun run typecheck
+bun run build:ui
+bun run build
+bun run lint
+bun run smoke
+(cd src-tauri && cargo check)
+```
+
+`src/ui/app/management-ui-acceptance.test.tsx` 覆盖最终验收重点：后端不可达时显示可理解错误、server/desktop 能力驱动导航、Cloudflare Tunnel capability gating、共享 UI 不越过 `ManagementClient` 边界，以及发布文档包含质量门禁。`lint` 当前仍是 `typecheck` 的别名；若后续引入 ESLint、Biome 或 formatter，应把新的检查命令接入这里和 CI。

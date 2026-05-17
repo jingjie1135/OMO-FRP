@@ -137,9 +137,11 @@ bun install
 bun test
 bun run typecheck
 bun run build
+bun run build:ui
 bun run lint
 bun run smoke
+(cd src-tauri && cargo check)
 node bin/opencode-remote.js version
 ```
 
-这些测试覆盖迁移后的安装/服务器部署规划器、frp 远程访问规划器、Cloudflare Tunnel 规划器和质量门禁文档一致性。当前项目尚未引入专用 formatter 或 ESLint/Biome 配置，因此 `lint` 暂作为依赖零新增的 TypeScript 静态检查别名；后续如建立格式化基线，可再新增 `format:check` 并接入 CI。
+这些测试覆盖迁移后的安装/服务器部署规划器、frp 远程访问规划器、Cloudflare Tunnel 规划器、共享 React 管理界面和质量门禁文档一致性。管理界面的最终整体验收入口是 `src/ui/app/management-ui-acceptance.test.tsx`，它覆盖后端不可达错误态、server/desktop 能力驱动导航、Cloudflare Tunnel capability gating、前端权限边界和发布检查清单。当前项目尚未引入专用 formatter 或 ESLint/Biome 配置，因此 `lint` 暂作为依赖零新增的 TypeScript 静态检查别名；后续如建立格式化基线，可再新增 `format:check` 并接入 CI。
