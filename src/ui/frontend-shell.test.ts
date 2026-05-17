@@ -51,7 +51,7 @@ describe("frontend shell configuration", () => {
     const mainSource = await readFile(join(root, "src", "ui", "main.tsx"), "utf8")
 
     expect(mainSource).toContain("createBrowserManagementClient")
-    expect(mainSource).toContain("<ManagementDashboardApp client={createBrowserManagementClient()} />")
+    expect(mainSource).toContain("<ManagementDashboardApp client={client} />")
     expect(mainSource).not.toContain("loadDashboardViewModel")
   })
 })
