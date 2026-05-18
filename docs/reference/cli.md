@@ -23,10 +23,14 @@ bun run cli -- help
 bun run smoke
 bun run typecheck
 bun run build
+bun run build:ui
+bun run lint
+(cd src-tauri && cargo check)
+docker build -f deploy/server/Dockerfile deploy/server
 node bin/opencode-remote.js version
 ```
 
-这些基础验证命令均由 `package.json` scripts 或 `bin/opencode-remote.js` 覆盖；README 和测试说明不应再把平台 CLI 写成 `oh-my-openagent`。
+这些基础验证命令均由 `package.json` scripts、`src-tauri/` Rust 项目、`deploy/server/Dockerfile` 或 `bin/opencode-remote.js` 覆盖；README 和测试说明不应再把平台 CLI 写成 `oh-my-openagent`。
 
 ## detect
 
@@ -120,7 +124,11 @@ bun install
 bun test
 bun run typecheck
 bun run build
+bun run build:ui
 bun run lint
+bun run smoke
+(cd src-tauri && cargo check)
+docker build -f deploy/server/Dockerfile deploy/server
 ```
 
-`lint` 目前是 `typecheck` 的别名，用作不新增 lint 依赖的最小静态检查门禁。项目尚未建立 formatter 基线，因此暂不在 CI 中强制格式化检查。
+`lint` 目前是 `typecheck` 的别名，用作不新增 lint 依赖的最小静态检查门禁。项目尚未建立 formatter 基线，因此暂不在 CI 中强制格式化检查。Docker / Tauri 产物链路分别由 `.github/workflows/docker-release.yml` 和 `.github/workflows/tauri-release.yml` 覆盖。

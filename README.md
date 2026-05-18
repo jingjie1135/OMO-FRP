@@ -141,7 +141,17 @@ bun run build:ui
 bun run lint
 bun run smoke
 (cd src-tauri && cargo check)
+docker build -f deploy/server/Dockerfile deploy/server
 node bin/opencode-remote.js version
 ```
 
 这些测试覆盖迁移后的安装/服务器部署规划器、frp 远程访问规划器、Cloudflare Tunnel 规划器、共享 React 管理界面和质量门禁文档一致性。管理界面的最终整体验收入口是 `src/ui/app/management-ui-acceptance.test.tsx`，它覆盖后端不可达错误态、server/desktop 能力驱动导航、Cloudflare Tunnel capability gating、前端权限边界和发布检查清单。当前项目尚未引入专用 formatter 或 ESLint/Biome 配置，因此 `lint` 暂作为依赖零新增的 TypeScript 静态检查别名；后续如建立格式化基线，可再新增 `format:check` 并接入 CI。
+
+## CI/CD 产物
+
+项目的 CI/CD 产物分为 Docker 部署镜像和 Tauri 桌面端产物：
+
+- Docker：`.github/workflows/docker-release.yml` 从 `deploy/server/Dockerfile` 构建服务器运行时镜像，并在默认分支或 `v*` tag 上推送到 GHCR。
+- Tauri：`.github/workflows/tauri-release.yml` 在手动触发或 `v*` tag 上构建 Windows、macOS 和 Linux 桌面端产物。
+
+第一版 Tauri 产物是 unsigned workflow artifacts，不包含 Windows 代码签名、macOS 签名或 notarization。正式签名、校验和、Tauri updater metadata 和 GitHub Release 聚合会在后续阶段单独加入。

@@ -3,7 +3,7 @@
 ## 1. 结论摘要
 
 - **总体结论**：当前仓库的本地质量门禁已经通过，CLI / 管理接口 / Tauri 桌面壳的基础可运行性已完成本地验证。
-- **已验证通过**：`bun test`、`bun run typecheck`、`bun run build`、`bun run smoke`、`cargo check`、`detect --json` / `detect --remote --json` 依赖探测、`start --remote --json` 密码脱敏。
+- **已验证通过**：`bun test`、`bun run typecheck`、`bun run build`、`bun run build:ui`、`bun run smoke`、`cargo check`、Docker server image build、`detect --json` / `detect --remote --json` 依赖探测、`start --remote --json` 密码脱敏。
 - **仍然阻塞**：真实公网 E2E / 浏览器链路仍未完成，因为当前环境缺少公网服务器、DNS/TLS、frp-panel 实例和 Cloudflare Tunnel 运行条件。
 - **报告边界**：本报告记录的是**当前 checkout 的本地可执行验证结果**，不是完整的公网部署验收结论。
 
@@ -42,8 +42,10 @@
 | `bun test` | pass | `64 pass / 0 fail` |
 | `bun run typecheck` | pass | `tsc --noEmit` 通过 |
 | `bun run build` | pass | 成功生成 `dist/opencode-remote.js` |
+| `bun run build:ui` | pass | 成功生成管理界面静态资源 |
 | `bun run smoke` | pass | 命令输出 `smoke passed` |
 | `cargo check`（`src-tauri/`） | pass | Tauri / Rust 桌面端检查通过 |
+| `docker build -f deploy/server/Dockerfile deploy/server` | pass | 服务器运行时 Docker image 可构建 |
 
 ### 3.3 CLI / 规划器 / 安全前置校验
 
@@ -149,4 +151,4 @@
    - 桌面端 + frp-panel 公网访问 + 浏览器验证
    - Cloudflare Tunnel quick / named 模式公网访问 + 浏览器验证
 2. 补录公网链路中的截图、浏览器控制台错误、网络错误、实际 URL（脱敏后）和失败复现步骤。
-3. 如果后续把 Tauri 桌面端纳入 CI，建议补充 Rust / Tauri 侧检查，而不仅是 Bun 侧质量门禁。
+3. Tauri 桌面端已经纳入基础 CI 的 Rust 检查，并由 `.github/workflows/tauri-release.yml` 负责 unsigned 桌面端 workflow artifacts；后续若加入签名、notarization 或 updater metadata，应补充对应的真发布验收记录。
