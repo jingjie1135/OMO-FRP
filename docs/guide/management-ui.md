@@ -57,6 +57,11 @@ bun run build
 bun run lint
 bun run smoke
 (cd src-tauri && cargo check)
+docker build -f deploy/server/Dockerfile deploy/server
 ```
 
 `src/ui/app/management-ui-acceptance.test.tsx` 覆盖最终验收重点：后端不可达时显示可理解错误、server/desktop 能力驱动导航、Cloudflare Tunnel capability gating、共享 UI 不越过 `ManagementClient` 边界，以及发布文档包含质量门禁。`lint` 当前仍是 `typecheck` 的别名；若后续引入 ESLint、Biome 或 formatter，应把新的检查命令接入这里和 CI。
+
+### Docker 与桌面端产物
+
+管理界面的发布链路不单独发布 UI zip。`bun run build:ui` 是 Tauri 桌面构建的前端输入，也是未来服务器镜像内置管理界面时的内部构建步骤。当前 CI/CD 第一版只面向 Docker 部署镜像和 unsigned Tauri 桌面端 workflow artifacts；签名、notarization、校验和、Tauri updater metadata 和 GitHub Release 聚合留到后续阶段。
