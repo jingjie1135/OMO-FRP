@@ -91,6 +91,102 @@ describe("local management runtime executor", () => {
     expect(result.message).toBe("started by executor")
     expect(calls).toEqual(["opencode-server"])
   })
+
+  it("delegates runtime execution and status methods to the runtime executor", async () => {
+    const calls: string[] = []
+    const executor: RuntimeExecutor = {
+      async detectTools() {
+        calls.push("detectTools")
+        return [{ kind: "opencode", displayName: "OpenCode", detected: true }]
+      },
+      async installTool(request) {
+        calls.push(`installTool:${request.kind}`)
+        return { jobId: `install:${request.kind}`, status: "failed", message: "install delegated" }
+      },
+      async startTool(instanceId) {
+        calls.push(`startTool:${instanceId}`)
+        return { jobId: `start:${instanceId}`, status: "failed", message: "start delegated" }
+      },
+      async stopTool(instanceId) {
+        calls.push(`stopTool:${instanceId}`)
+        return { jobId: `stop:${instanceId}`, status: "failed", message: "stop delegated" }
+      },
+      async restartTool(instanceId) {
+        calls.push(`restartTool:${instanceId}`)
+        return { jobId: `restart:${instanceId}`, status: "failed", message: "restart delegated" }
+      },
+      async getToolLogs(instanceId) {
+        calls.push(`getToolLogs:${instanceId}`)
+        return [{ timestamp: "2026-05-20T00:00:00.000Z", level: "info", message: "logs delegated" }]
+      },
+      async getFrpStatus() {
+        calls.push("getFrpStatus")
+        return { mode: "server", running: false, message: "frp delegated" }
+      },
+      async saveFrpConfig() { calls.push("saveFrpConfig") },
+      async startFrp() {
+        calls.push("startFrp")
+        return { jobId: "start-frp:server", status: "failed", message: "frp start delegated" }
+      },
+      async stopFrp() {
+        calls.push("stopFrp")
+        return { jobId: "stop-frp:server", status: "failed", message: "frp stop delegated" }
+      },
+      async getCloudflareTunnelStatus() {
+        calls.push("getCloudflareTunnelStatus")
+        return { mode: "unavailable", running: false, message: "cloudflare delegated" }
+      },
+      async saveCloudflareTunnelConfig() { calls.push("saveCloudflareTunnelConfig") },
+      async createCloudflareTunnelPlan() { throw new Error("not used") },
+      async startCloudflareTunnel() {
+        calls.push("startCloudflareTunnel")
+        return { jobId: "start-cloudflare:server", status: "failed", message: "cloudflare start delegated" }
+      },
+      async stopCloudflareTunnel() {
+        calls.push("stopCloudflareTunnel")
+        return { jobId: "stop-cloudflare:server", status: "failed", message: "cloudflare stop delegated" }
+      },
+      async retryCloudflareTunnelStep(stepId) {
+        calls.push(`retryCloudflareTunnelStep:${stepId}`)
+        return { jobId: `retry:${stepId}`, status: "failed", message: "retry delegated" }
+      },
+    }
+    const runtime = createLocalManagementRuntime({
+      capabilities: SERVER_CAPABILITIES,
+      defaultConfigDirectory: "/config",
+      frpStatusMode: "server",
+      executor,
+      config: createConfig({ toolInstances: [{ ...runningOpenCode, status: "stopped" }] }),
+    })
+
+    expect((await runtime.detectTools())[0]?.detected).toBe(true)
+    expect((await runtime.installTool({ kind: "opencode" })).message).toBe("install delegated")
+    expect((await runtime.stopTool("opencode-server")).message).toBe("stop delegated")
+    expect((await runtime.restartTool("opencode-server")).message).toBe("restart delegated")
+    expect((await runtime.getToolLogs("opencode-server"))[0]?.message).toBe("logs delegated")
+    expect((await runtime.getFrpStatus()).message).toBe("frp delegated")
+    expect((await runtime.startFrp()).message).toBe("frp start delegated")
+    expect((await runtime.stopFrp()).message).toBe("frp stop delegated")
+    expect((await runtime.getCloudflareTunnelStatus()).message).toBe("cloudflare delegated")
+    expect((await runtime.startCloudflareTunnel({ mode: "quick", localHost: "127.0.0.1", localPort: 4096 })).message).toBe("cloudflare start delegated")
+    expect((await runtime.stopCloudflareTunnel()).message).toBe("cloudflare stop delegated")
+    expect((await runtime.retryCloudflareTunnelStep("start_tunnel")).message).toBe("retry delegated")
+
+    expect(calls).toEqual([
+      "detectTools",
+      "installTool:opencode",
+      "stopTool:opencode-server",
+      "restartTool:opencode-server",
+      "getToolLogs:opencode-server",
+      "getFrpStatus",
+      "startFrp",
+      "stopFrp",
+      "getCloudflareTunnelStatus",
+      "startCloudflareTunnel",
+      "stopCloudflareTunnel",
+      "retryCloudflareTunnelStep:start_tunnel",
+    ])
+  })
 })
 
 describe("local management runtime endpoints", () => {
