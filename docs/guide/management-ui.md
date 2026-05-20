@@ -13,6 +13,8 @@ OpenCode 远程平台的管理界面采用同一套 React 管理界面，同时�
 
 同一套 React 管理界面包含 Dashboard、Tools、Config、Endpoints、FRP、Settings 等页面。页面通过 `RuntimeCapabilities` 判断当前能力：服务器模式显示服务器 OpenCode 状态、FRP 服务端状态和 endpoint 状态；桌面模式显示本机 OpenCode、frpc、服务器连接和公网访问地址。
 
+服务器 Docker 部署中，管理界面由 `management-ui` 容器运行。该容器服务 Vite 构建产物 `dist/ui`，并把 `/api/*` 请求交给同进程的 Management API handler。Caddy 的主域名代理到管理界面；OpenCode 自身 Web UI 放在 `opencode.<domain>`，frp-panel 放在 `frp.<domain>`。
+
 大部分页面共享实现，只有 FRP 页面按能力分支：
 
 - **FRP 服务端**：初始化 frp-panel，配置 frps/Caddy，管理 token/secret，查看客户端列表，生成桌面端连接配置。
@@ -53,15 +55,17 @@ bun test src/ui/app/management-ui-acceptance.test.tsx
 bun test
 bun run typecheck
 bun run build:ui
+bun run build:server
 bun run build
 bun run lint
 bun run smoke
 (cd src-tauri && cargo check)
-docker build -f deploy/server/Dockerfile deploy/server
+docker build --target management-ui -f deploy/server/Dockerfile .
+docker build --target opencode -f deploy/server/Dockerfile .
 ```
 
 `src/ui/app/management-ui-acceptance.test.tsx` 覆盖最终验收重点：后端不可达时显示可理解错误、server/desktop 能力驱动导航、Cloudflare Tunnel capability gating、共享 UI 不越过 `ManagementClient` 边界，以及发布文档包含质量门禁。`lint` 当前仍是 `typecheck` 的别名；若后续引入 ESLint、Biome 或 formatter，应把新的检查命令接入这里和 CI。
 
 ### Docker 与桌面端产物
 
-管理界面的发布链路不单独发布 UI zip。`bun run build:ui` 是 Tauri 桌面构建的前端输入，也是未来服务器镜像内置管理界面时的内部构建步骤。当前 CI/CD 第一版只面向 Docker 部署镜像和 unsigned Tauri 桌面端 workflow artifacts；签名、notarization、校验和、Tauri updater metadata 和 GitHub Release 聚合留到后续阶段。
+管理界面的发布链路不单独发布 UI zip。`bun run build:ui` 是 Tauri 桌面构建的前端输入，也是服务器 Docker 管理界面镜像的静态资源输入。当前 CI/CD 第一版只面向 Docker 部署镜像和 unsigned Tauri 桌面端 workflow artifacts；签名、notarization、校验和、Tauri updater metadata 和 GitHub Release 聚合留到后续阶段。

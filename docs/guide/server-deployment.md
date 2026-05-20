@@ -1,8 +1,9 @@
 # 服务器部署
 
-该服务器模板用于部署 OpenCode 远程平台的服务器流程。默认服务器流程只管理 FRP server、公共路由和受保护入口；OpenCode 安装、插件配置和启动必须通过 UI/CLI 显式动作执行：
+该服务器模板用于部署 OpenCode 远程平台的服务器流程。默认 Docker 流程会启动 OMO-FRP 管理界面、frp-panel、Caddy 和受密码保护的 OpenCode 工具服务；OpenCode 插件配置和公网 endpoint 仍必须通过 UI/CLI 显式动作执行：
 
-- OpenCode 可通过 `opencode-remote.service` 管理，但不会在服务器 bootstrap 中默认启动。
+- OMO-FRP 管理界面由 `management-ui` 容器提供，内置 React 静态资源和 `/api/*` Management API。
+- OpenCode 工具 Web UI 由 `opencode` 容器提供，并通过 `opencode.<domain>` 暴露在 Basic Auth 后面。
 - `oh-my-openagent` 会作为 OpenCode 插件安装到同一个 `OPENCODE_CONFIG_DIR`，但这是显式工具动作，不是服务器默认部署步骤。
 - Caddy 负责终止 HTTPS，并在代理到 OpenCode 前强制执行 Basic Auth。
 - frp-panel 通过 Docker Compose 运行，并为桌面端暴露 API/RPC 地址。
@@ -14,8 +15,8 @@
 - `deploy/server/.env.example`：环境变量和密钥模板。
 - `deploy/server/install.sh`：可重复执行的服务器安装流程。
 - `deploy/server/opencode-remote.service`：用于 OpenCode 的 systemd 单元。
-- `deploy/server/docker-compose.yml`：frp-panel 和 Caddy 服务定义。
-- `deploy/server/Caddyfile`：HTTPS、Basic Auth、OpenCode 反向代理和 frp-panel 反向代理配置。
+- `deploy/server/docker-compose.yml`：management-ui、opencode、frp-panel 和 Caddy 服务定义。
+- `deploy/server/Caddyfile`：HTTPS、Basic Auth、管理界面、OpenCode 和 frp-panel 反向代理配置。
 - `deploy/server/healthcheck.sh`：针对 frp-panel、Caddy 和服务器入口的本地健康检查脚本；OpenCode/插件检查由显式工具动作执行。
 
 ## 必需密钥
@@ -23,8 +24,11 @@
 启动服务前需要设置以下密钥：
 
 - `OPENCODE_SERVER_PASSWORD`：OpenCode 服务器认证所需密码。
-- `OPENCODE_REMOTE_BASIC_AUTH_PASSWORD_HASH`：通过 `caddy hash-password` 生成的 Caddy 哈希。
+- `OPENCODE_REMOTE_BASIC_AUTH_USER`：建议保持为 `opencode`，与 OpenCode 自身 Basic Auth 用户名一致。
+- `OPENCODE_REMOTE_BASIC_AUTH_PASSWORD_HASH`：通过 `caddy hash-password --plaintext "$OPENCODE_SERVER_PASSWORD"` 生成的 Caddy 哈希。这样主入口和 `opencode.<domain>` 可以使用同一组凭据。bcrypt 哈希包含 `$`，写入 `.env` 时需要用单引号包住，例如 `OPENCODE_REMOTE_BASIC_AUTH_PASSWORD_HASH='$2a$14$...'`，否则 Docker Compose 会把 `$...` 当成变量插值。
 - `FRP_PANEL_APP_GLOBAL_SECRET`：frp-panel 全局密钥。
+
+还需要确认 `OPENCODE_REMOTE_MANAGEMENT_UI_IMAGE` 和 `OPENCODE_REMOTE_OPENCODE_IMAGE` 指向已构建或已发布的镜像。默认示例使用 GHCR `edge` 镜像；本地验证可改为 `opencode-remote-platform-management-ui:local` 和 `opencode-remote-platform-opencode:local`。
 
 不要在缺少 `OPENCODE_SERVER_PASSWORD` 的情况下公开 OpenCode；当禁用自动生成密码时，平台规划器会阻止不安全的远程方案。
 
@@ -74,7 +78,7 @@ curl -fsSI http://127.0.0.1:9000 >/dev/null
 docker compose --env-file /opt/opencode-remote-platform/.env -f /opt/opencode-remote-platform/docker-compose.yml ps
 ```
 
-OpenCode 本地端口、`opencode-remote.service` 和 `bunx oh-my-openagent doctor --status` 属于显式 OpenCode 工具动作的检查项，不属于服务器默认部署健康检查。
+主域名应返回 OMO-FRP 管理界面，`opencode.<domain>` 应返回 OpenCode 自身 Web UI，`frp.<domain>` 应返回 frp-panel。`bunx oh-my-openagent doctor --status` 属于显式 OpenCode 插件动作的检查项，不属于服务器默认部署健康检查。
 
 公网 OpenCode 地址应先要求 Basic Auth，再要求 OpenCode 服务器密码。没有凭据的请求不能进入未认证的工作区。
 
@@ -86,5 +90,7 @@ OpenCode 本地端口、`opencode-remote.service` 和 `bunx oh-my-openagent doct
 - `FRP_PANEL_CLIENT_RPC_URL`
 - 目标本地 OpenCode 端口
 - 目标公网路由或端口策略
+
+在 Docker 服务器模板里，`FRP_PANEL_CLIENT_API_URL` / `FRP_PANEL_CLIENT_RPC_URL` 保留给桌面端操作者和外部客户端使用。容器内部的自连地址应使用单独的 `FRP_PANEL_INTERNAL_CLIENT_API_URL` / `FRP_PANEL_INTERNAL_CLIENT_RPC_URL`（默认 loopback），不要把对外 URL 覆盖成 `127.0.0.1`。
 
 不要通过日志共享 `FRP_PANEL_APP_GLOBAL_SECRET`、frp 服务器密钥或 OpenCode 服务器密码。

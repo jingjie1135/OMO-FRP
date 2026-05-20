@@ -103,7 +103,9 @@ opencode-remote-platform/
 
 项目正在扩展为“同一套 React 管理界面 + 两个薄运行时外壳”：服务器 Web 通过 HTTP ManagementClient 调用服务器 API，Tauri 桌面端通过 invoke bridge 调用本机能力。服务器侧提供 FRP 服务端、Caddy、公共 endpoint 和显式 OpenCode 操作；桌面侧提供 FRP 客户端、本机 OpenCode 检测和本机配置管理。
 
-服务器部署默认不安装 OpenCode，也不会默认启动 OpenCode。OpenCode、`oh-my-openagent` 插件和公网 endpoint 必须通过 UI/CLI 中的显式动作启用。完整说明见 `docs/guide/management-ui.md`。
+服务器 Docker 部署默认启动管理界面、frp-panel、Caddy 和受密码保护的 OpenCode 工具服务。主域名进入 OMO-FRP 管理界面；`opencode.<domain>` 指向 OpenCode 自身 Web UI。OpenCode、`oh-my-openagent` 插件和公网 endpoint 仍必须通过 UI/CLI 中的显式动作启用。完整说明见 `docs/guide/management-ui.md`。
+
+服务器部署建议使用同一组 `opencode` / `OPENCODE_SERVER_PASSWORD` 凭据保护主管理界面和 OpenCode 子域名；Caddy 的 Basic Auth hash 应由 `OPENCODE_SERVER_PASSWORD` 生成，并在 `.env` 中用单引号包住。
 
 ## 共享核心架构
 
@@ -138,10 +140,12 @@ bun test
 bun run typecheck
 bun run build
 bun run build:ui
+bun run build:server
 bun run lint
 bun run smoke
 (cd src-tauri && cargo check)
-docker build -f deploy/server/Dockerfile deploy/server
+docker build --target management-ui -f deploy/server/Dockerfile .
+docker build --target opencode -f deploy/server/Dockerfile .
 node bin/opencode-remote.js version
 ```
 
@@ -151,7 +155,8 @@ node bin/opencode-remote.js version
 
 项目的 CI/CD 产物分为 Docker 部署镜像和 Tauri 桌面端产物：
 
-- Docker：`.github/workflows/docker-release.yml` 从 `deploy/server/Dockerfile` 构建服务器运行时镜像，并在默认分支或 `v*` tag 上推送到 GHCR。
+- Docker：`.github/workflows/docker-release.yml` 从 `deploy/server/Dockerfile` 构建并发布两个 GHCR 镜像。
+- Docker 管理界面镜像使用 `management-ui` target，内置 `dist/ui` 和 `/api/*` Management API 入口。OpenCode 工具服务使用同一 Dockerfile 的 `opencode` target。
 - Tauri：`.github/workflows/tauri-release.yml` 在手动触发或 `v*` tag 上构建 Windows、macOS 和 Linux 桌面端产物。
 
 第一版 Tauri 产物是 unsigned workflow artifacts，不包含 Windows 代码签名、macOS 签名或 notarization。正式签名、校验和、Tauri updater metadata 和 GitHub Release 聚合会在后续阶段单独加入。
