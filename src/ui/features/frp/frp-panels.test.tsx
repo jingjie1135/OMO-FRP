@@ -129,17 +129,49 @@ describe("FRP panels", () => {
     )
 
     expect(container.querySelector("h2#frp-server-heading")).toBeTruthy()
-    expect(container.textContent).toContain("Panel URL")
+    expect(container.textContent).toContain("Panel 地址")
     expect(container.textContent).toContain("https://frp.example.com")
-    expect(container.textContent).toContain("RPC URL")
+    expect(container.textContent).toContain("RPC 地址")
     expect(container.textContent).toContain("https://frp.example.com/rpc")
-    expect(container.textContent).toContain("Server address")
-    expect(container.textContent).toContain("Bind port")
-    expect(container.textContent).toContain("Dashboard enabled")
+    expect(container.textContent).toContain("服务端地址")
+    expect(container.textContent).toContain("绑定端口")
+    expect(container.textContent).toContain("已启用")
     expect(container.textContent).toContain("FRP_TOKEN (masked)")
     expect(container.textContent).toContain("desktop-client")
     expect(container.textContent).toContain("Desktop Route")
     expect(container.textContent).not.toContain("super-secret-token")
+  })
+
+  it("renders the fomo-style FRP connection card and toggles the active connection", async () => {
+    let stopped = false
+    let started = false
+    const container = render(
+      <FrpPage
+        capabilities={serverCapabilities}
+        status={status}
+        endpoints={[endpoint]}
+        runtimeInfo={runtimeInfo}
+        serverConfig={serverConfig}
+        saveServerConfig={async () => {}}
+        startFrp={async () => {
+          started = true
+        }}
+        stopFrp={async () => {
+          stopped = true
+        }}
+      />,
+    )
+
+    expect(container.textContent).toContain("FRP 服务端")
+    expect(container.textContent).toContain("运行中")
+    expect(container.textContent).toContain("https://desktop.example.com")
+    const disconnectButton = Array.from(container.querySelectorAll("button")).find((button) => button.textContent?.includes("断开连接"))
+    expect(disconnectButton).toBeDefined()
+
+    await act(async () => disconnectButton?.dispatchEvent(new MouseEvent("click", { bubbles: true })))
+
+    expect(stopped).toBe(true)
+    expect(started).toBe(false)
   })
 
   it("lets users edit and save FRP server configuration", async () => {
@@ -260,7 +292,7 @@ describe("FRP panels", () => {
 
     document.body.innerHTML = ""
     const connectionContainer = render(<FrpConnectionCard serverAddr="frp.example.com" serverPort={7000} publicUrl="https://desktop.example.com" connected={true} tokenRef="FRP_TOKEN" />)
-    expect(connectionContainer.textContent).toContain("connected")
+    expect(connectionContainer.textContent).toContain("已连接")
     expect(connectionContainer.textContent).toContain("frp.example.com:7000")
     expect(connectionContainer.textContent).toContain("FRP_TOKEN (masked)")
 
@@ -272,7 +304,7 @@ describe("FRP panels", () => {
 
     document.body.innerHTML = ""
     const secretRouteContainer = render(<EndpointRouteForm {...clientConfig} authTokenRef="super-secret-token" publicUrl="https://desktop.example.com" />)
-    expect(secretRouteContainer.textContent).toContain("configured secret (masked)")
+    expect(secretRouteContainer.textContent).toContain("已配置密钥（已遮罩）")
     expect(secretRouteContainer.textContent).not.toContain("super-secret-token")
   })
 })
