@@ -91,8 +91,10 @@ describe("persisted server runtime adapter", () => {
       throw new Error("HTTP test server did not expose a TCP port")
     }
     const previousUrl = process.env.OPENCODE_INTERNAL_URL
+    const previousFrpPanelUrl = process.env.FRP_PANEL_INTERNAL_API_URL
     try {
       process.env.OPENCODE_INTERNAL_URL = `http://127.0.0.1:${address.port}`
+      process.env.FRP_PANEL_INTERNAL_API_URL = `http://127.0.0.1:${address.port}`
       const adapter = await createPersistedServerRuntimeAdapter()
 
       const result = await adapter.startFrp()
@@ -105,6 +107,8 @@ describe("persisted server runtime adapter", () => {
     } finally {
       if (previousUrl === undefined) delete process.env.OPENCODE_INTERNAL_URL
       else process.env.OPENCODE_INTERNAL_URL = previousUrl
+      if (previousFrpPanelUrl === undefined) delete process.env.FRP_PANEL_INTERNAL_API_URL
+      else process.env.FRP_PANEL_INTERNAL_API_URL = previousFrpPanelUrl
       await new Promise<void>((resolve, reject) => server.close((error) => (error ? reject(error) : resolve())))
       restore()
     }

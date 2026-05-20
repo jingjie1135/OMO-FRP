@@ -78,22 +78,30 @@ describe("management UI HTTP server", () => {
     }
     const previousRoot = process.env.OPENCODE_REMOTE_STATE_ROOT
     const previousUrl = process.env.OPENCODE_INTERNAL_URL
+    const previousFrpPanelUrl = process.env.FRP_PANEL_INTERNAL_API_URL
     process.env.OPENCODE_REMOTE_STATE_ROOT = stateRoot
     process.env.OPENCODE_INTERNAL_URL = `http://127.0.0.1:${address.port}`
+    process.env.FRP_PANEL_INTERNAL_API_URL = `http://127.0.0.1:${address.port}`
 
     try {
       const handler = await createManagementUiRequestHandler({ staticRoot })
 
-      const response = await handler(new Request("http://localhost/api/system/detect"))
-      const body = await response.json()
+      const detectResponse = await handler(new Request("http://localhost/api/system/detect"))
+      const detectBody = await detectResponse.json()
+      const frpResponse = await handler(new Request("http://localhost/api/frp/status"))
+      const frpBody = await frpResponse.json()
 
-      expect(response.status).toBe(200)
-      expect(body.some((tool: { kind?: string; detected?: boolean }) => tool.kind === "opencode" && tool.detected)).toBe(true)
+      expect(detectResponse.status).toBe(200)
+      expect(detectBody.some((tool: { kind?: string; detected?: boolean }) => tool.kind === "opencode" && tool.detected)).toBe(true)
+      expect(frpResponse.status).toBe(200)
+      expect(frpBody).toMatchObject({ mode: "server", running: true, status: "ready" })
     } finally {
       if (previousRoot === undefined) delete process.env.OPENCODE_REMOTE_STATE_ROOT
       else process.env.OPENCODE_REMOTE_STATE_ROOT = previousRoot
       if (previousUrl === undefined) delete process.env.OPENCODE_INTERNAL_URL
       else process.env.OPENCODE_INTERNAL_URL = previousUrl
+      if (previousFrpPanelUrl === undefined) delete process.env.FRP_PANEL_INTERNAL_API_URL
+      else process.env.FRP_PANEL_INTERNAL_API_URL = previousFrpPanelUrl
       server.close()
     }
   })
