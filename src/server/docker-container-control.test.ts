@@ -61,3 +61,71 @@ test("reports Docker API errors without throwing", async () => {
 
   expect(result).toEqual({ ok: false, message: "Docker returned HTTP 404: no such container" })
 })
+
+test("fails closed when compose discovery finds no OpenCode container", async () => {
+  const requests: Array<{ method: string; path: string }> = []
+  const controller = createDockerContainerController({
+    composeProject: "omo-frp",
+    composeService: "opencode",
+    transport: async (request) => {
+      requests.push(request)
+      return { statusCode: 200, body: "[]" }
+    },
+  })
+
+  const result = await controller.start()
+
+  expect(result).toEqual({ ok: false, message: "Docker Compose service discovery found no containers for omo-frp/opencode." })
+  expect(requests).toHaveLength(1)
+})
+
+test("fails closed when compose discovery finds multiple OpenCode containers", async () => {
+  const requests: Array<{ method: string; path: string }> = []
+  const controller = createDockerContainerController({
+    composeProject: "omo-frp",
+    composeService: "opencode",
+    transport: async (request) => {
+      requests.push(request)
+      return { statusCode: 200, body: JSON.stringify([{ Id: "one" }, { Id: "two" }]) }
+    },
+  })
+
+  const result = await controller.restart()
+
+  expect(result).toEqual({ ok: false, message: "Docker Compose service discovery found multiple containers for omo-frp/opencode." })
+  expect(requests).toHaveLength(1)
+})
+
+test("fails closed when compose discovery returns an API error", async () => {
+  const requests: Array<{ method: string; path: string }> = []
+  const controller = createDockerContainerController({
+    composeProject: "omo-frp",
+    composeService: "opencode",
+    transport: async (request) => {
+      requests.push(request)
+      return { statusCode: 500, body: "daemon unavailable" }
+    },
+  })
+
+  const result = await controller.stop()
+
+  expect(result).toEqual({ ok: false, message: "Docker Compose service discovery failed: Docker returned HTTP 500: daemon unavailable" })
+  expect(requests).toHaveLength(1)
+})
+
+test("fails closed when compose discovery returns invalid JSON", async () => {
+  const requests: Array<{ method: string; path: string }> = []
+  const controller = createDockerContainerController({
+    composeProject: "omo-frp",
+    composeService: "opencode",
+    transport: async (request) => {
+      requests.push(request)
+      return { statusCode: 200, body: "not-json" }
+    },
+  })
+
+  const result = await controller.restart()
+
+  expect(result).toEqual({ ok: false, message: "Docker Compose service discovery failed: invalid Docker response body." })
+  expect(requests).toHaveLength(1)
+})

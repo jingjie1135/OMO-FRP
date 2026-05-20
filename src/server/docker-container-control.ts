@@ -23,6 +23,12 @@ export interface DockerTransportResponse {
 
 export type DockerTransport = (request: DockerTransportRequest) => Promise<DockerTransportResponse>
 
+interface DockerContainerTarget {
+  ok: boolean
+  containerName?: string
+  message?: string
+}
+
 export interface CreateDockerContainerControllerOptions {
   containerName?: string
   composeProject?: string
@@ -51,9 +57,9 @@ export function createDockerContainerController(options: CreateDockerContainerCo
     },
   }
 
-  async function getContainerTarget(): Promise<string> {
+  async function getContainerTarget(): Promise<DockerContainerTarget> {
     if (!composeProject) {
-      return containerName
+      return { ok: true, containerName }
     }
 
     const filters = encodeURIComponent(JSON.stringify({
@@ -64,11 +70,32 @@ export function createDockerContainerController(options: CreateDockerContainerCo
     }))
     const response = await transport({ method: "GET", path: `/containers/json?all=true&filters=${filters}` })
     if (response.statusCode < 200 || response.statusCode >= 300) {
-      return containerName
+      return {
+        ok: false,
+        message: `Docker Compose service discovery failed: Docker returned HTTP ${response.statusCode}: ${getDockerErrorMessage(response.body)}`,
+      }
     }
-    const containers = JSON.parse(response.body) as Array<{ Id?: unknown }>
-    const containerId = containers.find((container) => typeof container.Id === "string")?.Id
-    return typeof containerId === "string" ? containerId : containerName
+
+    let containers: Array<{ Id?: unknown }>
+    try {
+      const parsed = JSON.parse(response.body) as unknown
+      if (!Array.isArray(parsed)) {
+        return { ok: false, message: "Docker Compose service discovery failed: invalid Docker response body." }
+      }
+      containers = parsed as Array<{ Id?: unknown }>
+    } catch {
+      return { ok: false, message: "Docker Compose service discovery failed: invalid Docker response body." }
+    }
+
+    const containerIds = containers.flatMap((container) => typeof container.Id === "string" ? [container.Id] : [])
+    if (containerIds.length === 0) {
+      return { ok: false, message: `Docker Compose service discovery found no containers for ${composeProject}/${composeService}.` }
+    }
+    if (containerIds.length > 1) {
+      return { ok: false, message: `Docker Compose service discovery found multiple containers for ${composeProject}/${composeService}.` }
+    }
+
+    return { ok: true, containerName: containerIds[0] }
   }
 }
 
@@ -94,12 +121,17 @@ function createDockerSocketTransport(socketPath: string): DockerTransport {
 
 async function runContainerAction(
   transport: DockerTransport,
-  getContainerTarget: () => Promise<string>,
+  getContainerTarget: () => Promise<DockerContainerTarget>,
   action: "start" | "stop" | "restart",
   successMessage: string,
   alreadyDoneMessage?: string,
 ): Promise<DockerContainerActionResult> {
-  const containerName = await getContainerTarget()
+  const target = await getContainerTarget()
+  if (!target.ok || !target.containerName) {
+    return { ok: false, message: target.message ?? "Docker container target could not be resolved." }
+  }
+
+  const containerName = target.containerName
   const response = await transport({ method: "POST", path: `/containers/${encodeURIComponent(containerName)}/${action}` })
   if (response.statusCode === 204) {
     return { ok: true, message: successMessage }
