@@ -68,9 +68,8 @@ function createEchoCommand(message: string): Pick<Parameters<typeof runCommand>[
 }
 
 function createSleepCommand(): Pick<Parameters<typeof runCommand>[0], "command" | "args"> {
-  if (process.platform === "win32") {
-    return { command: "cmd.exe", args: ["/c", "ping", "-n", "6", "127.0.0.1"] }
+  return {
+    command: process.execPath,
+    args: ["--eval", "await new Promise((resolve) => setTimeout(resolve, 2000))"],
   }
-
-  return { command: "sh", args: ["-c", "sleep 2"] }
 }
