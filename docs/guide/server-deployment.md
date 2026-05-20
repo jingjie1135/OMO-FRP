@@ -25,6 +25,7 @@
 启动服务前需要设置以下密钥：
 
 - `OPENCODE_SERVER_PASSWORD`：OpenCode 服务器认证所需密码。
+- `MANAGEMENT_API_SESSION_TOKEN`：管理界面内嵌 API 的 Bearer token。启用 `docker-compose.control.yml` 前必须设置，否则容器生命周期控制请求会被拒绝。
 - `OPENCODE_REMOTE_BASIC_AUTH_USER`：建议保持为 `opencode`，与 OpenCode 自身 Basic Auth 用户名一致。
 - `OPENCODE_REMOTE_BASIC_AUTH_PASSWORD_HASH`：通过 `caddy hash-password --plaintext "$OPENCODE_SERVER_PASSWORD"` 生成的 Caddy 哈希。这样主入口和 `opencode.<domain>` 可以使用同一组凭据。bcrypt 哈希包含 `$`，写入 `.env` 时需要用单引号包住，例如 `OPENCODE_REMOTE_BASIC_AUTH_PASSWORD_HASH='$2a$14$...'`，否则 Docker Compose 会把 `$...` 当成变量插值。
 - `FRP_PANEL_APP_GLOBAL_SECRET`：frp-panel 全局密钥。
@@ -78,13 +79,14 @@ opencode-remote start --remote --port 4096 --public-url https://opencode.example
 
 ```bash
 OPENCODE_CONTAINER_CONTROL_ENABLED=true
+MANAGEMENT_API_SESSION_TOKEN=replace-with-long-random-token
 docker compose --env-file /opt/opencode-remote-platform/.env \
   -f /opt/opencode-remote-platform/docker-compose.yml \
   -f /opt/opencode-remote-platform/docker-compose.control.yml \
   up -d management-ui
 ```
 
-启用后，`management-ui` 通过 Docker socket 查找 `OPENCODE_COMPOSE_PROJECT` / `OPENCODE_COMPOSE_SERVICE` 指定的 OpenCode 服务，并调用 Docker API 执行 start、stop、restart。不要在多租户或不可信管理界面中启用该覆盖文件。
+启用后，`management-ui` 会把 `MANAGEMENT_API_SESSION_TOKEN` 注入管理页面，并要求所有 Docker 生命周期请求携带该 Bearer token；同时它会通过 Docker socket 查找 `OPENCODE_COMPOSE_PROJECT` / `OPENCODE_COMPOSE_SERVICE` 指定的 OpenCode 服务，并调用 Docker API 执行 start、stop、restart。不要在多租户或不可信管理界面中启用该覆盖文件。
 
 ## 健康检查
 

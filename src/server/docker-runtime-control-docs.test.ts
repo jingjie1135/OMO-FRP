@@ -11,5 +11,6 @@ test("server deployment guide documents Docker control as an explicit opt-in", a
 
   expect(guide).toContain("docker-compose.control.yml")
   expect(guide).toContain("OPENCODE_CONTAINER_CONTROL_ENABLED=true")
+  expect(guide).toContain("MANAGEMENT_API_SESSION_TOKEN")
   expect(guide).toContain("Docker socket")
 })
