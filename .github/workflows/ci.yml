@@ -30,6 +30,9 @@ jobs:
       - name: Build UI
         run: bun run build:ui
 
+      - name: Build management UI server
+        run: bun run build:server
+
       - name: Lint
         run: bun run lint
 
@@ -53,5 +56,8 @@ jobs:
         working-directory: src-tauri
         run: cargo check
 
-      - name: Build server Docker image
-        run: docker build -f deploy/server/Dockerfile deploy/server
+      - name: Build management UI Docker image
+        run: docker build --target management-ui -f deploy/server/Dockerfile .
+
+      - name: Build OpenCode Docker image
+        run: docker build --target opencode -f deploy/server/Dockerfile .

@@ -20,7 +20,6 @@ on:
 
 env:
   REGISTRY: ghcr.io
-  IMAGE_NAME: jingjie1135/omo-frp/opencode-remote-server
 
 jobs:
   docker:
@@ -28,6 +27,14 @@ jobs:
     permissions:
       contents: read
       packages: write
+    strategy:
+      fail-fast: false
+      matrix:
+        image:
+          - target: management-ui
+            name: opencode-remote-management-ui
+          - target: opencode
+            name: opencode-remote-opencode
 
     steps:
       - name: Checkout
@@ -48,7 +55,7 @@ jobs:
         id: meta
         uses: docker/metadata-action@v6
         with:
-          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          images: ${{ env.REGISTRY }}/jingjie1135/omo-frp/${{ matrix.image.name }}
           tags: |
             type=edge,branch=$repo.default_branch
             type=ref,event=branch
@@ -62,8 +69,9 @@ jobs:
         id: build
         uses: docker/build-push-action@v7
         with:
-          context: deploy/server
+          context: .
           file: deploy/server/Dockerfile
+          target: ${{ matrix.image.target }}
           push: ${{ github.event_name != 'workflow_dispatch' || inputs.push_image == 'true' }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
@@ -75,7 +83,8 @@ jobs:
           {
             echo "## Docker image"
             echo ""
-            echo "Image: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}"
+            echo "Image: ${{ env.REGISTRY }}/jingjie1135/omo-frp/${{ matrix.image.name }}"
+            echo "Target: ${{ matrix.image.target }}"
             echo "Digest: ${{ steps.build.outputs.digest }}"
             echo ""
             echo 'Tags:'
