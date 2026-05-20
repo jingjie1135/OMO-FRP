@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it } from "bun:test"
-import { mkdir, mkdtemp, rm } from "node:fs/promises"
+import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises"
+import { createServer } from "node:http"
 import { join } from "node:path"
 import { tmpdir } from "node:os"
 import { createManagementUiRequestHandler } from "./management-ui-server"
@@ -52,6 +53,49 @@ describe("management UI HTTP server", () => {
 
     expect(response.status).toBe(200)
     expect(body.capabilities.mode).toBe("server")
+  })
+
+  it("uses persisted server runtime for default API requests", async () => {
+    const staticRoot = await createStaticRoot({ "index.html": "<div>OpenCode Remote Platform</div>" })
+    const stateRoot = await mkdtemp(join(tmpdir(), "omo-frp-ui-state-"))
+    tempDirs.push(stateRoot)
+    await mkdir(join(stateRoot, "config"), { recursive: true })
+    await writeFile(join(stateRoot, "config", "app-config.json"), JSON.stringify({
+      mode: "server",
+      toolInstances: [],
+      pluginConfigs: [],
+      publicEndpoints: [],
+      frpClients: [],
+    }), "utf8")
+    const server = createServer((_request, response) => {
+      response.writeHead(200, { "access-control-allow-origin": "*", "content-type": "text/plain" })
+      response.end("ok")
+    })
+    await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve))
+    const address = server.address()
+    if (!address || typeof address === "string") {
+      throw new Error("HTTP test server did not expose a TCP port")
+    }
+    const previousRoot = process.env.OPENCODE_REMOTE_STATE_ROOT
+    const previousUrl = process.env.OPENCODE_INTERNAL_URL
+    process.env.OPENCODE_REMOTE_STATE_ROOT = stateRoot
+    process.env.OPENCODE_INTERNAL_URL = `http://127.0.0.1:${address.port}`
+
+    try {
+      const handler = await createManagementUiRequestHandler({ staticRoot })
+
+      const response = await handler(new Request("http://localhost/api/system/detect"))
+      const body = await response.json()
+
+      expect(response.status).toBe(200)
+      expect(body.some((tool: { kind?: string; detected?: boolean }) => tool.kind === "opencode" && tool.detected)).toBe(true)
+    } finally {
+      if (previousRoot === undefined) delete process.env.OPENCODE_REMOTE_STATE_ROOT
+      else process.env.OPENCODE_REMOTE_STATE_ROOT = previousRoot
+      if (previousUrl === undefined) delete process.env.OPENCODE_INTERNAL_URL
+      else process.env.OPENCODE_INTERNAL_URL = previousUrl
+      server.close()
+    }
   })
 
   it("returns 400 for malformed encoded asset paths instead of crashing", async () => {
