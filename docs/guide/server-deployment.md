@@ -16,6 +16,7 @@
 - `deploy/server/install.sh`：可重复执行的服务器安装流程。
 - `deploy/server/opencode-remote.service`：用于 OpenCode 的 systemd 单元。
 - `deploy/server/docker-compose.yml`：management-ui、opencode、frp-panel 和 Caddy 服务定义。
+- `deploy/server/docker-compose.control.yml`：可选 Docker socket 覆盖文件，仅在显式允许管理界面控制 OpenCode 容器生命周期时使用。
 - `deploy/server/Caddyfile`：HTTPS、Basic Auth、管理界面、OpenCode 和 frp-panel 反向代理配置。
 - `deploy/server/healthcheck.sh`：针对 frp-panel、Caddy 和服务器入口的本地健康检查脚本；OpenCode/插件检查由显式工具动作执行。
 
@@ -70,6 +71,20 @@ opencode-remote start --remote --port 4096 --public-url https://opencode.example
 ```
 
 公开 route 启用前必须校验 `OPENCODE_SERVER_PASSWORD`、FRP token、域名 allowlist、TLS/反代状态和 route 唯一性。
+
+## 可选 OpenCode 容器控制
+
+默认部署不会把 Docker socket 挂载到管理界面容器，因此 UI 中的 OpenCode 启动、停止、重启动作会返回明确的禁用提示。只有在你接受管理界面容器可以调用 Docker Engine 的风险后，才启用该能力：
+
+```bash
+OPENCODE_CONTAINER_CONTROL_ENABLED=true
+docker compose --env-file /opt/opencode-remote-platform/.env \
+  -f /opt/opencode-remote-platform/docker-compose.yml \
+  -f /opt/opencode-remote-platform/docker-compose.control.yml \
+  up -d management-ui
+```
+
+启用后，`management-ui` 通过 Docker socket 查找 `OPENCODE_COMPOSE_PROJECT` / `OPENCODE_COMPOSE_SERVICE` 指定的 OpenCode 服务，并调用 Docker API 执行 start、stop、restart。不要在多租户或不可信管理界面中启用该覆盖文件。
 
 ## 健康检查
 

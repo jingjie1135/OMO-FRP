@@ -23,6 +23,7 @@ if [[ ! -f "$ENV_FILE" ]]; then
 fi
 
 install -m 0640 "$SOURCE_DIR/docker-compose.yml" "$ROOT/docker-compose.yml"
+install -m 0640 "$SOURCE_DIR/docker-compose.control.yml" "$ROOT/docker-compose.control.yml"
 install -m 0640 "$SOURCE_DIR/Caddyfile" "$ROOT/Caddyfile"
 install -m 0750 "$SOURCE_DIR/healthcheck.sh" "$ROOT/healthcheck.sh"
 install -m 0644 "$SOURCE_DIR/opencode-remote.service" /etc/systemd/system/opencode-remote.service
