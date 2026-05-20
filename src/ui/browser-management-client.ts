@@ -13,6 +13,7 @@ declare global {
     __TAURI__?: {
       core?: TauriInvokeBridge
     }
+    __OPENCODE_MANAGEMENT_SESSION_TOKEN__?: string
   }
 }
 
@@ -23,5 +24,6 @@ export function createBrowserManagementClient(options: BrowserManagementClientOp
   }
 
   const fetcher = options.fetch ?? ((input, init) => fetch(input, init))
-  return createServerManagementClient({ baseUrl: "", fetch: fetcher, sessionToken: options.sessionToken })
+  const sessionToken = options.sessionToken ?? globalThis.window?.__OPENCODE_MANAGEMENT_SESSION_TOKEN__
+  return createServerManagementClient({ baseUrl: "", fetch: fetcher, sessionToken })
 }

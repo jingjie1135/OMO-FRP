@@ -55,6 +55,43 @@ describe("management UI HTTP server", () => {
     expect(body.capabilities.mode).toBe("server")
   })
 
+  it("passes the management API session token from the server environment", async () => {
+    const staticRoot = await createStaticRoot({ "index.html": "<div>OpenCode Remote Platform</div>" })
+    const previousToken = process.env.MANAGEMENT_API_SESSION_TOKEN
+    process.env.MANAGEMENT_API_SESSION_TOKEN = "session-secret"
+
+    try {
+      const handler = createManagementUiRequestHandler({ staticRoot })
+
+      const unauthorized = await handler(new Request("http://localhost/api/runtime"))
+      const authorized = await handler(new Request("http://localhost/api/runtime", { headers: { authorization: "Bearer session-secret" } }))
+
+      expect(unauthorized.status).toBe(401)
+      expect(authorized.status).toBe(200)
+    } finally {
+      if (previousToken === undefined) delete process.env.MANAGEMENT_API_SESSION_TOKEN
+      else process.env.MANAGEMENT_API_SESSION_TOKEN = previousToken
+    }
+  })
+
+  it("injects the management API session token into served index HTML", async () => {
+    const staticRoot = await createStaticRoot({ "index.html": "<html><head></head><body><div>OpenCode Remote Platform</div></body></html>" })
+    const previousToken = process.env.MANAGEMENT_API_SESSION_TOKEN
+    process.env.MANAGEMENT_API_SESSION_TOKEN = "session-secret"
+
+    try {
+      const handler = createManagementUiRequestHandler({ staticRoot })
+
+      const response = await handler(new Request("http://localhost/"))
+      const html = await response.text()
+
+      expect(html).toContain("window.__OPENCODE_MANAGEMENT_SESSION_TOKEN__=\"session-secret\"")
+    } finally {
+      if (previousToken === undefined) delete process.env.MANAGEMENT_API_SESSION_TOKEN
+      else process.env.MANAGEMENT_API_SESSION_TOKEN = previousToken
+    }
+  })
+
   it("uses persisted server runtime for default API requests", async () => {
     const staticRoot = await createStaticRoot({ "index.html": "<div>OpenCode Remote Platform</div>" })
     const stateRoot = await mkdtemp(join(tmpdir(), "omo-frp-ui-state-"))

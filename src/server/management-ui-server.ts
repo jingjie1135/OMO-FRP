@@ -19,6 +19,7 @@ export function createManagementUiRequestHandler(options: ManagementUiRequestHan
     : createPersistedServerRuntimeAdapter().then((adapter) => createServerApi({
       adapter,
       sessionToken: process.env.MANAGEMENT_API_SESSION_TOKEN,
+      dockerControlRequiresSession: process.env.OPENCODE_CONTAINER_CONTROL_ENABLED === "true",
     }))
 
   return async function handleManagementUiRequest(request: Request): Promise<Response> {
@@ -33,7 +34,7 @@ export function createManagementUiRequestHandler(options: ManagementUiRequestHan
       return assetResponse ?? new Response("Not found", { status: 404 })
     }
 
-    const indexResponse = await serveStaticFile(staticRoot, "/index.html")
+    const indexResponse = await serveIndexHtml(staticRoot)
     return indexResponse ?? new Response("Management UI build is missing", { status: 503 })
   }
 }
@@ -79,6 +80,34 @@ async function serveStaticFile(staticRoot: string, requestPath: string): Promise
   }
 
   return new Response(await file.arrayBuffer(), { headers: { "content-type": getContentType(filePath) } })
+}
+
+async function serveIndexHtml(staticRoot: string): Promise<Response | null> {
+  const response = await serveStaticFile(staticRoot, "/index.html")
+  if (!response) {
+    return null
+  }
+
+  const sessionToken = process.env.MANAGEMENT_API_SESSION_TOKEN
+  if (!sessionToken) {
+    return response
+  }
+
+  const html = await response.text()
+  const injectedHtml = injectSessionToken(html, sessionToken)
+  return new Response(injectedHtml, { headers: { "content-type": response.headers.get("content-type") ?? "text/html; charset=utf-8" } })
+}
+
+function injectSessionToken(html: string, sessionToken: string): string {
+  const script = `<script>window.__OPENCODE_MANAGEMENT_SESSION_TOKEN__=${serializeForScript(sessionToken)}</script>`
+  return html.includes("</head>") ? html.replace("</head>", `${script}</head>`) : `${script}${html}`
+}
+
+function serializeForScript(value: string): string {
+  return JSON.stringify(value)
+    .replaceAll("<", "\\u003c")
+    .replaceAll(">", "\\u003e")
+    .replaceAll("&", "\\u0026")
 }
 
 function resolveStaticPath(staticRoot: string, requestPath: string): { filePath: string | null; status?: 400 } {

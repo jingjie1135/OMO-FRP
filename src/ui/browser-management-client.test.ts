@@ -83,4 +83,27 @@ describe("createBrowserManagementClient", () => {
 
     expect(authorizations).toEqual(["Bearer session-secret"])
   })
+
+  it("uses a browser-provided management session token", async () => {
+    const previousWindow = globalThis.window
+    const authorizations: Array<string | null> = []
+    Object.defineProperty(globalThis, "window", {
+      configurable: true,
+      value: { __OPENCODE_MANAGEMENT_SESSION_TOKEN__: "browser-session" },
+    })
+    const client = createBrowserManagementClient({
+      fetch: async (_input, init) => {
+        authorizations.push(new Headers(init?.headers).get("authorization"))
+        return Response.json({ jobId: "restart", status: "succeeded", message: "ok" })
+      },
+    })
+
+    try {
+      await client.restartTool("opencode-server")
+
+      expect(authorizations).toEqual(["Bearer browser-session"])
+    } finally {
+      Object.defineProperty(globalThis, "window", { configurable: true, value: previousWindow })
+    }
+  })
 })
