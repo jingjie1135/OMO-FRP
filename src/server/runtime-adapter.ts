@@ -77,6 +77,10 @@ export interface CreateServerRuntimeAdapterOptions {
   executor?: RuntimeExecutor
 }
 
+export interface CreatePersistedServerRuntimeAdapterOptions {
+  executor?: RuntimeExecutor
+}
+
 export function createServerRuntimeAdapter(config: AppConfig = createEmptyServerConfig(), options: CreateServerRuntimeAdapterOptions = {}): ServerRuntimeAdapter {
   return createLocalManagementRuntime({
     capabilities: SERVER_CAPABILITIES,
@@ -88,15 +92,16 @@ export function createServerRuntimeAdapter(config: AppConfig = createEmptyServer
   })
 }
 
-export async function createPersistedServerRuntimeAdapter(): Promise<ServerRuntimeAdapter> {
+export async function createPersistedServerRuntimeAdapter(options: CreatePersistedServerRuntimeAdapterOptions = {}): Promise<ServerRuntimeAdapter> {
   const paths = createServerRuntimePaths()
+  const executor = options.executor ?? createServerRuntimeExecutor()
   const config = await loadServerAppConfig(paths.appConfigPath)
   const adapter = createServerRuntimeAdapter(config, {
     defaultConfigDirectory: paths.configDirectory,
     storage: new NodeStorage(),
-    executor: createServerRuntimeExecutor(),
+    executor,
   })
-  return createDurableServerRuntimeAdapter(adapter, paths)
+  return createDurableServerRuntimeAdapter(adapter, paths, executor)
 }
 
 export function createEmptyServerConfig(): AppConfig {
@@ -109,7 +114,7 @@ export function createEmptyServerConfig(): AppConfig {
   }
 }
 
-function createDurableServerRuntimeAdapter(adapter: ServerRuntimeAdapter, paths: ServerRuntimePaths): ServerRuntimeAdapter {
+function createDurableServerRuntimeAdapter(adapter: ServerRuntimeAdapter, paths: ServerRuntimePaths, executor: RuntimeExecutor): ServerRuntimeAdapter {
   async function persistConfig(): Promise<void> {
     const runtime = await adapter.getRuntimeInfo()
     await saveServerAppConfig(paths.appConfigPath, runtime.config)
@@ -146,7 +151,13 @@ function createDurableServerRuntimeAdapter(adapter: ServerRuntimeAdapter, paths:
     async startTool(instanceId) { return recordJob("start", instanceId, await adapter.startTool(instanceId)) },
     async stopTool(instanceId) { return recordJob("stop", instanceId, await adapter.stopTool(instanceId)) },
     async restartTool(instanceId) { return recordJob("restart", instanceId, await adapter.restartTool(instanceId)) },
-    async getToolLogs(instanceId) { return readRuntimeLogs(createLogPath(paths, instanceId)) },
+    async getToolLogs(instanceId) {
+      const [durableLogs, liveLogs] = await Promise.all([
+        readRuntimeLogs(createLogPath(paths, instanceId)),
+        executor.getToolLogs(instanceId),
+      ])
+      return [...durableLogs, ...liveLogs]
+    },
     async readConfig(target) { return adapter.readConfig(constrainConfigTarget(paths, target)) },
     async validateConfig(target, content) { return adapter.validateConfig(constrainConfigTarget(paths, target), content) },
     async saveConfig(target, content) { await withPersistedConfig(() => adapter.saveConfig(constrainConfigTarget(paths, target), content)) },

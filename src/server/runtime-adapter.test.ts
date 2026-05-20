@@ -4,6 +4,8 @@ import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { afterEach, describe, expect, it } from "bun:test"
 import type { PublicEndpoint } from "../core/app-config/types"
+import type { RuntimeExecutor } from "../management-api/runtime-executor"
+import type { LogLine } from "../management-api/types"
 import { createServerRuntimePaths } from "./server-runtime-paths"
 import { saveServerAppConfig } from "./server-runtime-state"
 import { loadServerAppConfig } from "./server-runtime-state"
@@ -114,6 +116,21 @@ describe("persisted server runtime adapter", () => {
     }
   })
 
+  it("combines durable runtime logs with live executor tool logs", async () => {
+    const { restore } = await useTempStateRoot()
+    try {
+      const adapter = await createPersistedServerRuntimeAdapter({
+        executor: createExecutorWithLogs([{ timestamp: "2026-05-21T00:00:00.000Z", level: "info", message: "OpenCode listening" }]),
+      })
+
+      const logs = await adapter.getToolLogs("opencode-server")
+
+      expect(logs).toEqual([{ timestamp: "2026-05-21T00:00:00.000Z", level: "info", message: "OpenCode listening" }])
+    } finally {
+      restore()
+    }
+  })
+
   it("loads config files from server storage", async () => {
     const { restore } = await useTempStateRoot()
     try {
@@ -161,5 +178,26 @@ async function useTempStateRoot(): Promise<{ root: string; restore: () => void }
       if (previousRoot === undefined) delete process.env.OPENCODE_REMOTE_STATE_ROOT
       else process.env.OPENCODE_REMOTE_STATE_ROOT = previousRoot
     },
+  }
+}
+
+function createExecutorWithLogs(logs: LogLine[]): RuntimeExecutor {
+  return {
+    async detectTools() { return [] },
+    async installTool() { throw new Error("not used") },
+    async startTool() { throw new Error("not used") },
+    async stopTool() { throw new Error("not used") },
+    async restartTool() { throw new Error("not used") },
+    async getToolLogs() { return logs },
+    async getFrpStatus() { return { mode: "server", running: false, message: "not used" } },
+    async saveFrpConfig() {},
+    async startFrp() { throw new Error("not used") },
+    async stopFrp() { throw new Error("not used") },
+    async getCloudflareTunnelStatus() { return { mode: "unavailable", running: false, message: "not used" } },
+    async saveCloudflareTunnelConfig() {},
+    async createCloudflareTunnelPlan() { throw new Error("not used") },
+    async startCloudflareTunnel() { throw new Error("not used") },
+    async stopCloudflareTunnel() { throw new Error("not used") },
+    async retryCloudflareTunnelStep() { throw new Error("not used") },
   }
 }

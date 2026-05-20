@@ -1,5 +1,6 @@
 import type { RuntimeExecutor } from "../management-api/runtime-executor"
 import type { FrpStatus } from "../management-api/types"
+import type { LogLine } from "../management-api/types"
 import type { ToolDetection } from "../management-api/types"
 import { createDockerContainerController } from "./docker-container-control"
 import type { DockerContainerActionResult, DockerContainerController } from "./docker-container-control"
@@ -47,7 +48,12 @@ export function createServerRuntimeExecutor(options: ServerRuntimeExecutorOption
     async restartTool(instanceId) {
       return controlOpenCodeContainer("restart", instanceId, opencodeContainerControlEnabled, () => opencodeContainerController.restart())
     },
-    async getToolLogs() { return [] },
+    async getToolLogs(instanceId) {
+      if (!instanceId.startsWith("opencode")) {
+        return []
+      }
+      return getOpenCodeContainerLogs(opencodeContainerControlEnabled, opencodeContainerController)
+    },
     async getFrpStatus() { return getServerFrpStatus(await frpPanelClient.health()) },
     async saveFrpConfig() {},
     async startFrp() { return { jobId: "start-frp:server", status: "failed", message: "FRP server execution is not connected yet." } },
@@ -60,6 +66,19 @@ export function createServerRuntimeExecutor(options: ServerRuntimeExecutorOption
     async retryCloudflareTunnelStep(stepId) {
       return { jobId: `retry-cloudflare:${stepId}`, status: "failed", message: "Cloudflare retry is not connected yet." }
     },
+  }
+}
+
+async function getOpenCodeContainerLogs(enabled: boolean, controller: DockerContainerController): Promise<LogLine[]> {
+  if (!enabled) {
+    return []
+  }
+
+  try {
+    const result = await controller.logs()
+    return result.ok ? result.logs : []
+  } catch {
+    return []
   }
 }
 

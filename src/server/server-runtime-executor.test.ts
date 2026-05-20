@@ -118,6 +118,9 @@ test("keeps OpenCode container control disabled unless explicitly enabled", asyn
         calls.push("restart")
         return { ok: true, message: "restarted" }
       },
+      async logs() {
+        throw new Error("not used")
+      },
     },
   })
 
@@ -148,6 +151,9 @@ test("starts, stops, and restarts the OpenCode container when control is enabled
         calls.push("restart")
         return { ok: true, message: "OpenCode container restarted." }
       },
+      async logs() {
+        throw new Error("not used")
+      },
     },
   })
 
@@ -161,6 +167,33 @@ test("starts, stops, and restarts the OpenCode container when control is enabled
   expect(calls).toEqual(["start", "stop", "restart"])
 })
 
+test("returns real OpenCode container logs when control is enabled", async () => {
+  const executor = createServerRuntimeExecutor({
+    opencodeContainerControlEnabled: true,
+    opencodeContainerController: {
+      async start() {
+        throw new Error("not used")
+      },
+      async stop() {
+        throw new Error("not used")
+      },
+      async restart() {
+        throw new Error("not used")
+      },
+      async logs() {
+        return {
+          ok: true,
+          logs: [{ timestamp: "2026-05-21T00:00:00.000Z", level: "info", message: "OpenCode listening" }],
+        }
+      },
+    },
+  })
+
+  const logs = await executor.getToolLogs("opencode-server")
+
+  expect(logs).toEqual([{ timestamp: "2026-05-21T00:00:00.000Z", level: "info", message: "OpenCode listening" }])
+})
+
 test("fails OpenCode container control when Docker reports an error", async () => {
   const executor = createServerRuntimeExecutor({
     opencodeContainerControlEnabled: true,
@@ -172,6 +205,9 @@ test("fails OpenCode container control when Docker reports an error", async () =
         throw new Error("not used")
       },
       async restart() {
+        throw new Error("not used")
+      },
+      async logs() {
         throw new Error("not used")
       },
     },
@@ -197,6 +233,9 @@ test("reports Docker socket failures as failed OpenCode jobs", async () => {
         throw new Error("not used")
       },
       async restart() {
+        throw new Error("not used")
+      },
+      async logs() {
         throw new Error("not used")
       },
     },
