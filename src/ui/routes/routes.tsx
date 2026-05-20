@@ -2,12 +2,12 @@ import type { LayoutRoute } from "../layout/AppLayout"
 import type { RuntimeCapabilities } from "../../core/app-config/types"
 
 const baseRoutes: LayoutRoute[] = [
-  { path: "/", label: "Dashboard" },
-  { path: "/tools", label: "Tools" },
-  { path: "/config", label: "Config" },
-  { path: "/endpoints", label: "Endpoints" },
-  { path: "/frp", label: "FRP" },
-  { path: "/settings", label: "Settings" },
+  { path: "/", label: "主控台" },
+  { path: "/tools", label: "工具管理" },
+  { path: "/endpoints", label: "公网入口" },
+  { path: "/config", label: "配置与备份" },
+  { path: "/frp", label: "FRP 穿透" },
+  { path: "/settings", label: "系统设置" },
 ]
 
 export const routes: LayoutRoute[] = baseRoutes
@@ -20,7 +20,7 @@ export function getRoutesForCapabilities(capabilities: RuntimeCapabilities): Lay
   const insertAfterFrp = baseRoutes.findIndex((route) => route.path === "/frp") + 1
   return [
     ...baseRoutes.slice(0, insertAfterFrp),
-    { path: "/cloudflare", label: "Cloudflare Tunnel" },
+    { path: "/cloudflare", label: "Cloudflare 隧道" },
     ...baseRoutes.slice(insertAfterFrp),
   ]
 }

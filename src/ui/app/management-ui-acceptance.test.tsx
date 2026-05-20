@@ -26,17 +26,19 @@ describe("management UI acceptance", () => {
     const serverHtml = await renderManagementApp(createAcceptanceClient(serverInfo, serverCalls))
     const desktopHtml = await renderManagementApp(createAcceptanceClient(desktopInfo, desktopCalls))
 
-    expect(serverHtml).toContain("OpenCode Platform (server)")
-    expect(serverHtml).toContain("Cloudflare Tunnel")
+    expect(serverHtml).toContain("FOMO")
+    expect(serverHtml).toContain("服务器模式")
+    expect(serverHtml).toContain("Cloudflare 隧道")
     expect(serverHtml).toContain("dashboard:server")
-    expect(serverHtml).toContain("frp:server")
-    expect(serverHtml).toContain("settings:mode=server")
+    expect(serverHtml).toContain('data-frp-panel="server"')
+    expect(serverHtml).toContain('data-settings-mode="server"')
 
-    expect(desktopHtml).toContain("OpenCode Platform (desktop)")
-    expect(desktopHtml).toContain("Cloudflare Tunnel")
+    expect(desktopHtml).toContain("FOMO")
+    expect(desktopHtml).toContain("桌面模式")
+    expect(desktopHtml).toContain("Cloudflare 隧道")
     expect(desktopHtml).toContain("dashboard:desktop")
-    expect(desktopHtml).toContain("frp:client")
-    expect(desktopHtml).toContain("settings:mode=desktop")
+    expect(desktopHtml).toContain('data-frp-panel="client"')
+    expect(desktopHtml).toContain('data-settings-mode="desktop"')
 
     expect(serverCalls).toContain("createCloudflareTunnelPlan")
     expect(desktopCalls).toContain("createCloudflareTunnelPlan")
@@ -46,7 +48,7 @@ describe("management UI acceptance", () => {
     const calls: string[] = []
     const html = await renderManagementApp(createAcceptanceClient(createRuntimeInfo("server", false), calls))
 
-    expect(html).not.toContain("Cloudflare Tunnel")
+    expect(html).not.toContain("Cloudflare 隧道")
     expect(calls).not.toContain("getCloudflareTunnelStatus")
     expect(calls).not.toContain("createCloudflareTunnelPlan")
   })

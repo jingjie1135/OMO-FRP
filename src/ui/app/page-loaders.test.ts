@@ -189,7 +189,7 @@ describe("page loaders", () => {
 
     const config = (await loadConfigPage(client)) as React.ReactElement
     const configContainer = render(config)
-    expect(configContainer.textContent).toContain("All changes saved")
+    expect(configContainer.textContent).toContain("当前修改已保存")
 
     const endpoints = (await loadEndpointsPage(client)) as React.ReactElement
     const endpointsContainer = render(endpoints)
@@ -201,14 +201,14 @@ describe("page loaders", () => {
 
     const frp = (await loadFrpPage(client)) as React.ReactElement
     const frpContainer = render(frp)
-    expect(frpContainer.textContent).toContain("frp:server")
+    expect(frpContainer.querySelector('[data-frp-panel="server"]')).toBeTruthy()
 
     const cloudflare = (await loadCloudflareTunnelPage(client)) as React.ReactElement
     const cloudflareContainer = render(cloudflare)
-    expect(cloudflareContainer.textContent).toContain("cloudflare:quick")
+    expect(cloudflareContainer.querySelector('[data-cloudflare-mode="quick"]')).toBeTruthy()
 
     const settings = (await loadSettingsPage(client)) as React.ReactElement
     const settingsContainer = render(settings)
-    expect(settingsContainer.textContent).toContain("settings:mode=server")
+    expect(settingsContainer.querySelector('[data-settings-mode="server"]')).toBeTruthy()
   })
 })
