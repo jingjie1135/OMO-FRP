@@ -6,9 +6,10 @@ export interface DashboardViewProps {
   runtimeInfo: RuntimeInfo
   frpStatus: FrpStatus
   logs: LogLine[]
+  onOpenPage?: (page: "tools" | "config" | "frp" | "endpoints") => void
 }
 
-export function DashboardView({ runtimeInfo, frpStatus, logs }: DashboardViewProps) {
+export function DashboardView({ runtimeInfo, frpStatus, logs, onOpenPage }: DashboardViewProps) {
   const tools = runtimeInfo.config.toolInstances
   const runningTools = tools.filter((tool) => tool.status === "running").length
   const activeEndpoints = runtimeInfo.config.publicEndpoints.filter((endpoint) => endpoint.status === "active").length
@@ -64,16 +65,28 @@ export function DashboardView({ runtimeInfo, frpStatus, logs }: DashboardViewPro
         </div>
       </div>
 
-      <div className="rounded-xl border border-slate-800 bg-slate-900">
-        <div className="flex items-center justify-between border-b border-slate-800 bg-slate-800/50 px-4 py-3">
-          <h2 className="flex items-center text-sm font-medium text-slate-200">
-            <Terminal className="mr-2 h-4 w-4" />
-            近期系统运行日志
-          </h2>
-          <span className="font-mono text-xs text-slate-500">只读</span>
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+        <div className="rounded-xl border border-slate-800 bg-slate-900 lg:col-span-2">
+          <div className="flex items-center justify-between border-b border-slate-800 bg-slate-800/50 px-4 py-3">
+            <h2 className="flex items-center text-sm font-medium text-slate-200">
+              <Terminal className="mr-2 h-4 w-4" />
+              近期系统运行日志
+            </h2>
+            <span className="font-mono text-xs text-slate-500">实时</span>
+          </div>
+          <div className="space-y-2 p-4 font-mono text-xs text-slate-300">
+            {logs.length === 0 ? <p className="text-slate-500">暂无日志</p> : logs.map((log) => <LogRow key={`${log.timestamp}-${log.message}`} log={log} />)}
+          </div>
         </div>
-        <div className="space-y-2 p-4 font-mono text-xs text-slate-300">
-          {logs.length === 0 ? <p className="text-slate-500">暂无日志</p> : logs.map((log) => <LogRow key={`${log.timestamp}-${log.message}`} log={log} />)}
+
+        <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+          <h2 className="mb-4 text-sm font-medium text-slate-800">快捷操作</h2>
+          <div className="space-y-3">
+            <QuickActionButton label="管理工具实例" onClick={() => onOpenPage?.("tools")} accent="blue" />
+            <QuickActionButton label="立即备份当前配置" onClick={() => onOpenPage?.("config")} accent="emerald" />
+            <QuickActionButton label="更新 FRP 隧道" onClick={() => onOpenPage?.("frp")} accent="purple" />
+            <QuickActionButton label="查看入口安全" onClick={() => onOpenPage?.("endpoints")} accent="amber" />
+          </div>
         </div>
       </div>
 
@@ -87,6 +100,21 @@ export function DashboardView({ runtimeInfo, frpStatus, logs }: DashboardViewPro
         state:{tools.length === 0 && runtimeInfo.config.publicEndpoints.length === 0 ? "empty" : "ready"}
       </div>
     </section>
+  )
+}
+
+function QuickActionButton({ label, onClick, accent }: { label: string; onClick: () => void; accent: "blue" | "emerald" | "purple" | "amber" }) {
+  const accentClass = {
+    blue: "hover:border-blue-500 hover:bg-blue-50",
+    emerald: "hover:border-emerald-500 hover:bg-emerald-50",
+    purple: "hover:border-purple-500 hover:bg-purple-50",
+    amber: "text-amber-700 hover:border-amber-500 hover:bg-amber-50 hover:text-amber-800",
+  }[accent]
+
+  return (
+    <button type="button" onClick={onClick} className={`w-full rounded-lg border border-slate-200 px-4 py-2.5 text-left text-sm font-medium text-slate-700 transition-colors ${accentClass}`}>
+      {label}
+    </button>
   )
 }
 
