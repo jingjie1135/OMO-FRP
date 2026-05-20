@@ -5,7 +5,7 @@ import { redactSensitiveText } from "../shared/redact-sensitive-text"
 
 export async function appendRuntimeLog(path: string, line: LogLine): Promise<void> {
   await mkdir(dirname(path), { recursive: true })
-  await appendFile(path, `${JSON.stringify(line)}\n`, "utf8")
+  await appendFile(path, `${JSON.stringify({ ...line, message: redactSensitiveText(line.message) })}\n`, "utf8")
 }
 
 export async function readRuntimeLogs(path: string, limit = 500): Promise<LogLine[]> {
