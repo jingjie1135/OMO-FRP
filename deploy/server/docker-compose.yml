@@ -6,6 +6,8 @@ services:
       MANAGEMENT_UI_HOST: 0.0.0.0
       MANAGEMENT_UI_PORT: ${MANAGEMENT_UI_PORT:-4080}
       MANAGEMENT_UI_STATIC_ROOT: /app/dist/ui
+      FRP_PANEL_INTERNAL_API_URL: ${FRP_PANEL_INTERNAL_API_URL:-http://frp-panel:${FRP_PANEL_API_PORT:-9000}}
+      OPENCODE_INTERNAL_URL: ${OPENCODE_INTERNAL_URL:-http://opencode:${OPENCODE_PORT:-4096}}
 
   opencode:
     image: ${OPENCODE_REMOTE_OPENCODE_IMAGE:-opencode-remote-platform-opencode:local}
