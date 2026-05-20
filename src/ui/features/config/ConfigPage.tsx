@@ -52,8 +52,8 @@ export function ConfigPage(state: ConfigPageState) {
 
   const handleSave = async () => {
     const confirmationMessage = selectedMissing
-      ? "Are you sure you want to create a new configuration for this target?"
-      : "Are you sure you want to overwrite the current configuration?"
+      ? "确认要为当前目标创建新的配置文件吗？"
+      : "确认要覆盖当前配置内容吗？"
     if (window.confirm(confirmationMessage)) {
       setSaveError(null)
       try {
@@ -67,11 +67,11 @@ export function ConfigPage(state: ConfigPageState) {
   const handleApplyPreset = async (presetId: string) => {
     const preset = presets.find((item) => item.id === presetId)
     const targetLabel = `${selectedTarget.toolInstanceId}:${selectedTarget.kind}`
-    if (window.confirm(`Apply preset "${preset?.name ?? presetId}" to ${targetLabel}?\n\nAffected range: active configuration content\nBackup behavior: create backup before apply.`)) {
+    if (window.confirm(`确认将预设“${preset?.name ?? presetId}”应用到 ${targetLabel} 吗？\n\n影响范围：当前激活配置内容\n备份策略：应用前自动创建备份。`)) {
       try {
         await applyPreset(presetId)
       } catch (e) {
-        alert(`Failed to apply preset: ${e instanceof Error ? e.message : String(e)}`)
+        alert(`应用预设失败：${e instanceof Error ? e.message : String(e)}`)
       }
     }
   }
@@ -80,40 +80,43 @@ export function ConfigPage(state: ConfigPageState) {
     const backup = backups.find((item) => item.id === backupId)
     const targetLabel = `${selectedTarget.toolInstanceId}:${selectedTarget.kind}`
     const backupBehavior = selectedMissing
-      ? "Pre-restore backup behavior: no current config exists, so no fresh backup will be created."
-      : "Pre-restore backup behavior: create a fresh backup before restore."
-    if (window.confirm(`Restore backup "${backupId}" for ${targetLabel}?\n\nBackup path: ${backup?.path ?? "unknown"}\nOverwrite warning: current configuration will be replaced.\n${backupBehavior}`)) {
+      ? "恢复前说明：当前没有现有配置，因此不会额外生成新的恢复前备份。"
+      : "恢复前说明：会先为当前配置创建一份新的恢复前备份。"
+    if (window.confirm(`确认恢复 ${targetLabel} 的备份“${backupId}”吗？\n\n备份路径：${backup?.path ?? "未知"}\n覆盖提醒：当前配置将被替换。\n${backupBehavior}`)) {
       try {
         await restoreBackup(backupId)
       } catch (e) {
-        alert(`Failed to restore backup: ${e instanceof Error ? e.message : String(e)}`)
+        alert(`恢复备份失败：${e instanceof Error ? e.message : String(e)}`)
       }
     }
   }
 
   return (
-    <div className="p-4 space-y-6">
-      <div className="flex justify-between items-center">
-        <h1 className="text-2xl font-bold">Configuration Editor</h1>
+    <div className="flex h-[calc(100vh-4rem)] flex-col p-8">
+      <div className="mb-8 flex shrink-0 justify-between items-center">
+        <div>
+          <p className="text-sm font-medium text-slate-500">配置、预设与备份</p>
+          <h1 className="text-2xl font-semibold text-slate-900">配置与备份</h1>
+        </div>
         <button
           onClick={() => refresh()}
           disabled={loading}
           className="px-3 py-1 text-sm bg-gray-100 hover:bg-gray-200 rounded border transition-colors"
         >
-          {loading ? "Refreshing..." : "Refresh"}
+          {loading ? "刷新中..." : "刷新"}
         </button>
       </div>
 
       {(error || saveError) && (
         <div role="alert" className="p-4 bg-red-50 text-red-700 rounded border border-red-200">
-          <h2 className="font-bold mb-1">Error</h2>
+          <h2 className="font-bold mb-1">配置错误</h2>
           <p>{error || saveError}</p>
         </div>
       )}
 
       {fieldErrors.length > 0 && (
         <div role="alert" className="p-4 bg-amber-50 text-amber-800 rounded border border-amber-200">
-          <h2 className="font-bold mb-1">Validation details</h2>
+          <h2 className="font-bold mb-1">校验详情</h2>
           <ul className="list-disc list-inside text-sm space-y-1">
             {fieldErrors.map((fieldError) => (
               <li key={`${fieldError.field}:${fieldError.message}`}>{fieldError.field}: {fieldError.message}</li>
@@ -122,78 +125,84 @@ export function ConfigPage(state: ConfigPageState) {
         </div>
       )}
 
-      <section aria-labelledby="target-selection-heading" className="bg-white p-4 rounded shadow border">
-        <h2 id="target-selection-heading" className="text-lg font-semibold mb-3">Target Selection</h2>
-        <div className="flex gap-4">
+      <section aria-labelledby="target-selection-heading" className="sr-only">
+        <h2 id="target-selection-heading">配置目标</h2>
+      </section>
+
+      <div className="flex min-h-0 flex-1 flex-col gap-6 lg:flex-row">
+        <section aria-labelledby="editor-heading" className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+          <div className="flex shrink-0 items-center justify-between border-b border-slate-200 bg-slate-50 px-4 py-3">
+            <div className="flex items-center gap-3">
+              <h2 id="editor-heading" className="text-base font-medium text-slate-800">配置内容</h2>
           <button
             onClick={() => selectTarget({ toolInstanceId: selectedTarget.toolInstanceId, kind: "opencode", path: opencodePath })}
-            className={`px-4 py-2 rounded border transition-colors ${selectedTarget.kind === 'opencode' ? 'border-blue-500 bg-blue-50 text-blue-700' : 'bg-gray-50 border-gray-200 hover:bg-gray-100'}`}
+                className={`rounded-md border px-3 py-1.5 text-sm transition-colors ${selectedTarget.kind === 'opencode' ? 'border-blue-500 bg-blue-50 text-blue-700' : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'}`}
           >
             OpenCode
           </button>
           <button
             onClick={() => selectTarget({ toolInstanceId: selectedTarget.toolInstanceId, kind: "oh-my-openagent", path: ohMyOpenAgentPath })}
-            className={`px-4 py-2 rounded border transition-colors ${selectedTarget.kind === 'oh-my-openagent' ? 'border-blue-500 bg-blue-50 text-blue-700' : 'bg-gray-50 border-gray-200 hover:bg-gray-100'}`}
+                className={`rounded-md border px-3 py-1.5 text-sm transition-colors ${selectedTarget.kind === 'oh-my-openagent' ? 'border-blue-500 bg-blue-50 text-blue-700' : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'}`}
           >
             OhMyOpenAgent
           </button>
+            </div>
+            <div className="flex items-center gap-4">
+              <span className="text-xs text-slate-500">最后更新于：{updatedAt ? new Date(updatedAt).toLocaleString() : "暂无更新时间"}</span>
+              <button
+                onClick={handleSave}
+                disabled={loading || !isDirty}
+                className={`rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white shadow-sm transition-all ${loading || !isDirty ? 'cursor-not-allowed opacity-50' : 'hover:bg-blue-700 active:scale-95'}`}
+              >
+                {loading ? "保存中..." : "保存配置"}
+              </button>
+            </div>
         </div>
-      </section>
-
-      <section aria-labelledby="editor-heading" className="bg-white p-4 rounded shadow border">
-        <div className="flex justify-between items-center mb-3">
-          <h2 id="editor-heading" className="text-lg font-semibold">Content Editor</h2>
-          <div className="text-xs text-gray-500 font-mono">
-            {updatedAt ? `Last updated: ${new Date(updatedAt).toLocaleString()}` : "No update time"}
+          <div className="shrink-0 space-y-1 border-b border-slate-100 px-4 py-3">
+          <p className="text-sm text-gray-600">当前目标：{selectedTarget.toolInstanceId}:{selectedTarget.kind}</p>
+          <p className="text-sm text-gray-600">配置路径：{selectedPath ?? "未上报"}</p>
+          <p className="text-sm text-gray-600">文件状态：{selectedMissing ? "缺失" : "可用"}</p>
+          {selectedReadError && <p className="text-sm text-amber-700">读取提醒：{selectedReadError}</p>}
           </div>
-        </div>
-        <div className="space-y-4">
-          <p className="text-sm text-gray-600">Selected target: {selectedTarget.toolInstanceId}:{selectedTarget.kind}</p>
-          <p className="text-sm text-gray-600">Config path: {selectedPath ?? "not reported"}</p>
-          <p className="text-sm text-gray-600">Missing state: {selectedMissing ? "missing" : "available"}</p>
-          {selectedReadError && <p className="text-sm text-amber-700">Read warning: {selectedReadError}</p>}
           <textarea
-            className="w-full h-64 p-3 font-mono text-sm bg-gray-50 border rounded focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all"
+            className="min-h-0 flex-1 resize-none bg-slate-900 p-6 font-mono text-sm leading-relaxed text-slate-200 outline-none transition-all focus:ring-2 focus:ring-blue-500"
             value={content}
             onChange={(e) => setContent(e.target.value)}
-            placeholder="Enter configuration content..."
+            placeholder="请输入或粘贴配置内容..."
+            spellCheck={false}
           />
-          <div className="flex justify-between items-center">
+          <div className="flex shrink-0 justify-between border-t border-slate-200 px-4 py-3">
             <span className="text-sm text-gray-500 italic">
-              {isDirty ? "Unsaved changes" : "All changes saved"}
+              {isDirty ? "存在未保存修改" : "当前修改已保存"}
             </span>
-            <button
-              onClick={handleSave}
-              disabled={loading || !isDirty}
-              className={`px-6 py-2 bg-blue-600 text-white rounded font-medium shadow transition-all ${loading || !isDirty ? 'opacity-50 cursor-not-allowed' : 'hover:bg-blue-700 active:transform active:scale-95'}`}
-            >
-              {loading ? "Saving..." : "Save Changes"}
-            </button>
+            <span className="text-xs text-slate-500">最后更新于：{updatedAt ? new Date(updatedAt).toLocaleString() : "暂无更新时间"}</span>
           </div>
-        </div>
-      </section>
+        </section>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <section aria-labelledby="presets-heading" className="bg-white p-4 rounded shadow border">
-          <h2 id="presets-heading" className="text-lg font-semibold mb-3">Configuration Presets</h2>
+        <aside className="flex w-full shrink-0 flex-col gap-6 lg:w-80">
+        <section aria-labelledby="presets-heading" className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+          <div className="mb-3 flex items-center justify-between">
+            <h2 id="presets-heading" className="text-lg font-semibold">配置预设</h2>
+            <span className="text-sm font-medium text-blue-600">应用预设</span>
+          </div>
           <div className="space-y-2">
             {presets.length === 0 ? (
-              <p className="text-gray-500 italic text-sm">No presets available for this target.</p>
+              <p className="text-gray-500 italic text-sm">当前目标暂无可用预设。</p>
             ) : (
                 presets.map(preset => (
                   <div key={preset.id} className="flex justify-between items-center p-2 hover:bg-gray-50 rounded border border-transparent hover:border-gray-200 transition-all">
                     <div>
                       <div className="font-medium text-sm">{preset.name || preset.id}</div>
                       <div className="text-xs text-gray-500 font-mono">{preset.path}</div>
-                      <div className="text-xs text-gray-500">Target: {selectedTarget.toolInstanceId}:{selectedTarget.kind}</div>
-                      <div className="text-xs text-gray-500">Affected range: active configuration content</div>
-                      <div className="text-xs text-gray-500">Backup behavior: create backup before apply</div>
+                      <div className="text-xs text-gray-500">目标：{selectedTarget.toolInstanceId}:{selectedTarget.kind}</div>
+                      <div className="text-xs text-gray-500">影响范围：当前激活配置内容</div>
+                      <div className="text-xs text-gray-500">备份策略：应用前自动备份</div>
                     </div>
                     <button
                     onClick={() => handleApplyPreset(preset.id)}
                     className="px-3 py-1 text-xs text-blue-600 hover:bg-blue-50 rounded border border-blue-200 transition-colors"
                   >
-                    Apply
+                    应用
                   </button>
                 </div>
               ))
@@ -201,31 +210,32 @@ export function ConfigPage(state: ConfigPageState) {
           </div>
         </section>
 
-        <section aria-labelledby="backups-heading" className="bg-white p-4 rounded shadow border">
-          <h2 id="backups-heading" className="text-lg font-semibold mb-3">Recent Backups</h2>
+        <section aria-labelledby="backups-heading" className="min-h-0 rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+          <h2 id="backups-heading" className="mb-3 text-lg font-semibold">最近备份</h2>
           <div className="space-y-2">
             {backups.length === 0 ? (
-              <p className="text-gray-500 italic text-sm">No backups available for this target.</p>
+              <p className="text-gray-500 italic text-sm">当前目标暂无可恢复备份。</p>
             ) : (
                 backups.map(backup => (
                   <div key={backup.id} className="flex justify-between items-center p-2 hover:bg-gray-50 rounded border border-transparent hover:border-gray-200 transition-all">
                     <div>
                       <div className="font-medium text-sm">{new Date(backup.createdAt).toLocaleString()}</div>
                       <div className="text-xs text-gray-500 font-mono truncate max-w-[200px]">{backup.id}</div>
-                      <div className="text-xs text-gray-500">Target: {backup.target.toolInstanceId}:{backup.target.kind}</div>
-                      <div className="text-xs text-gray-500 font-mono truncate max-w-[200px]">Path: {backup.path}</div>
+                      <div className="text-xs text-gray-500">目标：{backup.target.toolInstanceId}:{backup.target.kind}</div>
+                      <div className="text-xs text-gray-500 font-mono truncate max-w-[200px]">路径：{backup.path}</div>
                     </div>
                   <button
                     onClick={() => handleRestoreBackup(backup.id)}
                     className="px-3 py-1 text-xs text-gray-600 hover:bg-gray-100 rounded border border-gray-300 transition-colors"
                   >
-                    Restore
+                    恢复
                   </button>
                 </div>
               ))
             )}
           </div>
         </section>
+        </aside>
       </div>
     </div>
   )
