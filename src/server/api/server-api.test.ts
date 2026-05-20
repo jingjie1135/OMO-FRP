@@ -135,6 +135,18 @@ describe("server api", () => {
     expect(response.status).toBe(401)
   })
 
+  it("requires an administrator session when Docker control mode is enabled", async () => {
+    const api = createServerApi({ dockerControlRequiresSession: true })
+
+    const response = await api.request("/api/tools/opencode-server/restart", {
+      method: "POST",
+      headers: { "content-type": "application/json", "x-management-ui-request": "1" },
+    })
+
+    expect(response.status).toBe(401)
+    expect(await response.json()).toEqual({ error: "Docker control requires an administrator session token." })
+  })
+
   it("rejects mutating requests without a management UI request header", async () => {
     const api = createServerApi({ sessionToken: "session-secret" })
 

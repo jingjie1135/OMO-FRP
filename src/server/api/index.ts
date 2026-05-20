@@ -9,6 +9,7 @@ export interface ServerApi {
 export interface ServerApiOptions {
   adapter?: ServerRuntimeAdapter
   sessionToken?: string
+  dockerControlRequiresSession?: boolean
 }
 
 export function createServerApi(options: ServerApiOptions = {}): ServerApi {
@@ -16,11 +17,15 @@ export function createServerApi(options: ServerApiOptions = {}): ServerApi {
 
   return {
     async request(path: string, init: RequestInit = {}): Promise<Response> {
+      const method = (init.method ?? "GET").toUpperCase()
+      if (options.dockerControlRequiresSession && !options.sessionToken && isDockerControlRequest(path, method)) {
+        return jsonResponse({ error: "Docker control requires an administrator session token." }, 401)
+      }
+
       if (!isAuthorized(init.headers, options.sessionToken)) {
         return jsonResponse({ error: "Unauthorized" }, 401)
       }
 
-      const method = (init.method ?? "GET").toUpperCase()
       if (!isManagementUiRequest(method, init.headers)) {
         return jsonResponse({ error: "Forbidden" }, 403)
       }
@@ -196,6 +201,12 @@ function isAuthorized(headers: HeadersInit | undefined, sessionToken: string | u
 
   const normalizedHeaders = new Headers(headers)
   return normalizedHeaders.get("authorization") === `Bearer ${sessionToken}`
+}
+
+function isDockerControlRequest(path: string, method: string): boolean {
+  return method === "POST"
+    && path.startsWith("/api/tools/")
+    && (path.endsWith("/start") || path.endsWith("/stop") || path.endsWith("/restart"))
 }
 
 async function parseJsonBody(body: BodyInit): Promise<unknown> {
