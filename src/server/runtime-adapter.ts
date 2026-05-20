@@ -21,6 +21,8 @@ import type {
   Diagnostics,
 } from "../management-api/types"
 import { createLocalManagementRuntime } from "../management-api/local-management-runtime"
+import { createServerRuntimePaths } from "./server-runtime-paths"
+import { loadServerAppConfig } from "./server-runtime-state"
 
 export interface ServerRuntimeAdapter {
   getRuntimeInfo(): Promise<RuntimeInfo>
@@ -67,6 +69,12 @@ export function createServerRuntimeAdapter(config: AppConfig = createEmptyServer
     defaultConfigDirectory: "/opt/opencode-remote-platform/config",
     frpStatusMode: "server",
   })
+}
+
+export async function createPersistedServerRuntimeAdapter(): Promise<ServerRuntimeAdapter> {
+  const paths = createServerRuntimePaths()
+  const config = await loadServerAppConfig(paths.appConfigPath)
+  return createServerRuntimeAdapter(config)
 }
 
 export function createEmptyServerConfig(): AppConfig {
