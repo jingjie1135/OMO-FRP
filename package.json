@@ -13,8 +13,10 @@
     "test": "bun test src/**/*.test.ts src/**/*.test.tsx",
     "typecheck": "bunx --bun tsc --noEmit",
     "build": "bun build src/cli-program.ts --outfile=dist/opencode-remote.js --target=bun",
+    "build:server": "bun build src/server/management-ui-server.ts --outfile=dist/server/management-ui-server.js --target=bun",
     "dev:ui": "bunx --bun vite",
     "build:ui": "bunx --bun vite build",
+    "serve:management-ui": "bun run src/server/management-ui-server.ts",
     "tauri": "bunx @tauri-apps/cli",
     "build:desktop": "bun run build:ui && bunx @tauri-apps/cli build --config '{\"build\":{\"beforeBuildCommand\":\"\"}}'",
     "lint": "bun run typecheck"
