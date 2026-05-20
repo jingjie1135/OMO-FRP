@@ -1,4 +1,5 @@
 import type { SettingsManagementClient } from "./client"
+import type { RuntimeExecutor } from "./runtime-executor"
 import type {
   ConfigBackup,
   ConfigDocument,
@@ -48,6 +49,7 @@ export interface CreateLocalManagementRuntimeOptions {
   frpStatusMode: FrpStatus["mode"]
   config?: AppConfig
   storage?: StorageAdapter
+  executor?: RuntimeExecutor
   now?: () => Date
 }
 
@@ -107,6 +109,10 @@ export function createLocalManagementRuntime(options: CreateLocalManagementRunti
     },
 
     async startTool(instanceId: string): Promise<JobResult> {
+      if (options.executor) {
+        return options.executor.startTool(instanceId)
+      }
+
       const tool = state.config.toolInstances.find((item) => item.id === instanceId)
       if (!tool) {
         return createJobResult("start", instanceId, "failed", `Unknown tool instance: ${instanceId}`)

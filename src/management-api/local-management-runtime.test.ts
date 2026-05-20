@@ -2,6 +2,7 @@ import { describe, expect, it } from "bun:test"
 import { SERVER_CAPABILITIES } from "../core/app-config/types"
 import type { AppConfig, PublicEndpoint, ToolInstance } from "../core/app-config/types"
 import { createLocalManagementRuntime } from "./local-management-runtime"
+import type { RuntimeExecutor } from "./runtime-executor"
 
 const runningOpenCode: ToolInstance = {
   id: "opencode-server",
@@ -35,6 +36,62 @@ function createConfig(overrides: Partial<AppConfig> = {}): AppConfig {
     ...overrides,
   }
 }
+
+describe("local management runtime executor", () => {
+  it("delegates tool start to the runtime executor", async () => {
+    const calls: string[] = []
+    const executor: RuntimeExecutor = {
+      async detectTools() { return [] },
+      async installTool() { throw new Error("not used") },
+      async startTool(instanceId) {
+        calls.push(instanceId)
+        return { jobId: `start:${instanceId}`, status: "succeeded", message: "started by executor" }
+      },
+      async stopTool() { throw new Error("not used") },
+      async restartTool() { throw new Error("not used") },
+      async getToolLogs() { return [] },
+      async getFrpStatus() { return { mode: "server", running: false, message: "not running" } },
+      async saveFrpConfig() {},
+      async startFrp() { throw new Error("not used") },
+      async stopFrp() { throw new Error("not used") },
+      async getCloudflareTunnelStatus() { return { mode: "unavailable", running: false, message: "not configured" } },
+      async saveCloudflareTunnelConfig() {},
+      async createCloudflareTunnelPlan() { throw new Error("not used") },
+      async startCloudflareTunnel() { throw new Error("not used") },
+      async stopCloudflareTunnel() { throw new Error("not used") },
+      async retryCloudflareTunnelStep(stepId) {
+        return { jobId: `retry:${stepId}`, status: "succeeded", message: "retried" }
+      },
+    }
+
+    const runtime = createLocalManagementRuntime({
+      capabilities: SERVER_CAPABILITIES,
+      defaultConfigDirectory: "/config",
+      frpStatusMode: "server",
+      executor,
+      config: {
+        mode: "server",
+        toolInstances: [{
+          id: "opencode-server",
+          kind: "opencode",
+          displayName: "OpenCode",
+          hostType: "server",
+          installState: "installed",
+          defaultPort: 4096,
+          status: "stopped",
+        }],
+        pluginConfigs: [],
+        publicEndpoints: [],
+        frpClients: [],
+      },
+    })
+
+    const result = await runtime.startTool("opencode-server")
+
+    expect(result.message).toBe("started by executor")
+    expect(calls).toEqual(["opencode-server"])
+  })
+})
 
 describe("local management runtime endpoints", () => {
   it("normalizes saved endpoint URLs and forces client-supplied active status to disabled", async () => {
