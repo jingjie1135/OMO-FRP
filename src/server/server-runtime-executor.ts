@@ -1,6 +1,8 @@
 import type { RuntimeExecutor } from "../management-api/runtime-executor"
 import type { FrpStatus } from "../management-api/types"
 import type { ToolDetection } from "../management-api/types"
+import { createDockerContainerController } from "./docker-container-control"
+import type { DockerContainerActionResult, DockerContainerController } from "./docker-container-control"
 import { createFrpPanelClient } from "./frp-panel-client"
 import type { FrpPanelHealth } from "./frp-panel-client"
 
@@ -12,12 +14,16 @@ export interface ServerRuntimeExecutorOptions {
   opencodeUrl?: string
   frpPanelUrl?: string
   frpPanelClient?: FrpPanelHealthClient
+  opencodeContainerControlEnabled?: boolean
+  opencodeContainerController?: DockerContainerController
 }
 
 export function createServerRuntimeExecutor(options: ServerRuntimeExecutorOptions = {}): RuntimeExecutor {
   const opencodeUrl = options.opencodeUrl ?? process.env.OPENCODE_INTERNAL_URL ?? "http://opencode:4096"
   const frpPanelUrl = options.frpPanelUrl ?? process.env.FRP_PANEL_INTERNAL_API_URL ?? `http://frp-panel:${process.env.FRP_PANEL_API_PORT ?? "9000"}`
   const frpPanelClient = options.frpPanelClient ?? createFrpPanelClient({ baseUrl: frpPanelUrl })
+  const opencodeContainerControlEnabled = options.opencodeContainerControlEnabled ?? process.env.OPENCODE_CONTAINER_CONTROL_ENABLED === "true"
+  const opencodeContainerController = options.opencodeContainerController ?? createDockerContainerController()
 
   return {
     async detectTools(): Promise<ToolDetection[]> {
@@ -33,13 +39,13 @@ export function createServerRuntimeExecutor(options: ServerRuntimeExecutorOption
       return { jobId: `install:${request.kind}`, status: "failed", message: "Server runtime installs tools through Docker images." }
     },
     async startTool(instanceId) {
-      return { jobId: `start:${instanceId}`, status: "failed", message: "OpenCode container start is not enabled for this runtime yet." }
+      return controlOpenCodeContainer("start", instanceId, opencodeContainerControlEnabled, () => opencodeContainerController.start())
     },
     async stopTool(instanceId) {
-      return { jobId: `stop:${instanceId}`, status: "failed", message: "OpenCode container stop is not enabled for this runtime yet." }
+      return controlOpenCodeContainer("stop", instanceId, opencodeContainerControlEnabled, () => opencodeContainerController.stop())
     },
     async restartTool(instanceId) {
-      return { jobId: `restart:${instanceId}`, status: "failed", message: "OpenCode container restart is not enabled for this runtime yet." }
+      return controlOpenCodeContainer("restart", instanceId, opencodeContainerControlEnabled, () => opencodeContainerController.restart())
     },
     async getToolLogs() { return [] },
     async getFrpStatus() { return getServerFrpStatus(await frpPanelClient.health()) },
@@ -55,6 +61,33 @@ export function createServerRuntimeExecutor(options: ServerRuntimeExecutorOption
       return { jobId: `retry-cloudflare:${stepId}`, status: "failed", message: "Cloudflare retry is not connected yet." }
     },
   }
+}
+
+async function controlOpenCodeContainer(
+  action: "start" | "stop" | "restart",
+  instanceId: string,
+  enabled: boolean,
+  operation: () => Promise<DockerContainerActionResult>,
+) {
+  const jobId = `${action}:${instanceId}`
+  if (!instanceId.startsWith("opencode")) {
+    return { jobId, status: "failed" as const, message: `Server runtime can only ${action} OpenCode tool instances.` }
+  }
+  if (!enabled) {
+    return {
+      jobId,
+      status: "failed" as const,
+      message: "OpenCode container control is disabled. Set OPENCODE_CONTAINER_CONTROL_ENABLED=true and mount the Docker socket to enable it.",
+    }
+  }
+
+  let result: DockerContainerActionResult
+  try {
+    result = await operation()
+  } catch (error) {
+    return { jobId, status: "failed" as const, message: `Docker container control failed: ${error instanceof Error ? error.message : String(error)}` }
+  }
+  return { jobId, status: result.ok ? "succeeded" as const : "failed" as const, message: result.message }
 }
 
 function getServerFrpStatus(health: FrpPanelHealth): FrpStatus {

@@ -101,3 +101,112 @@ test("uses the FRP panel internal API environment URL", async () => {
     server.close()
   }
 })
+
+test("keeps OpenCode container control disabled unless explicitly enabled", async () => {
+  const calls: string[] = []
+  const executor = createServerRuntimeExecutor({
+    opencodeContainerController: {
+      async start() {
+        calls.push("start")
+        return { ok: true, message: "started" }
+      },
+      async stop() {
+        calls.push("stop")
+        return { ok: true, message: "stopped" }
+      },
+      async restart() {
+        calls.push("restart")
+        return { ok: true, message: "restarted" }
+      },
+    },
+  })
+
+  const result = await executor.startTool("opencode-server")
+
+  expect(result).toEqual({
+    jobId: "start:opencode-server",
+    status: "failed",
+    message: "OpenCode container control is disabled. Set OPENCODE_CONTAINER_CONTROL_ENABLED=true and mount the Docker socket to enable it.",
+  })
+  expect(calls).toEqual([])
+})
+
+test("starts, stops, and restarts the OpenCode container when control is enabled", async () => {
+  const calls: string[] = []
+  const executor = createServerRuntimeExecutor({
+    opencodeContainerControlEnabled: true,
+    opencodeContainerController: {
+      async start() {
+        calls.push("start")
+        return { ok: true, message: "OpenCode container started." }
+      },
+      async stop() {
+        calls.push("stop")
+        return { ok: true, message: "OpenCode container stopped." }
+      },
+      async restart() {
+        calls.push("restart")
+        return { ok: true, message: "OpenCode container restarted." }
+      },
+    },
+  })
+
+  const start = await executor.startTool("opencode-server")
+  const stop = await executor.stopTool("opencode-server")
+  const restart = await executor.restartTool("opencode-server")
+
+  expect(start).toEqual({ jobId: "start:opencode-server", status: "succeeded", message: "OpenCode container started." })
+  expect(stop).toEqual({ jobId: "stop:opencode-server", status: "succeeded", message: "OpenCode container stopped." })
+  expect(restart).toEqual({ jobId: "restart:opencode-server", status: "succeeded", message: "OpenCode container restarted." })
+  expect(calls).toEqual(["start", "stop", "restart"])
+})
+
+test("fails OpenCode container control when Docker reports an error", async () => {
+  const executor = createServerRuntimeExecutor({
+    opencodeContainerControlEnabled: true,
+    opencodeContainerController: {
+      async start() {
+        return { ok: false, message: "Docker returned HTTP 404: no such container" }
+      },
+      async stop() {
+        throw new Error("not used")
+      },
+      async restart() {
+        throw new Error("not used")
+      },
+    },
+  })
+
+  const result = await executor.startTool("opencode-server")
+
+  expect(result).toEqual({
+    jobId: "start:opencode-server",
+    status: "failed",
+    message: "Docker returned HTTP 404: no such container",
+  })
+})
+
+test("reports Docker socket failures as failed OpenCode jobs", async () => {
+  const executor = createServerRuntimeExecutor({
+    opencodeContainerControlEnabled: true,
+    opencodeContainerController: {
+      async start() {
+        throw new Error("connect ENOENT /var/run/docker.sock")
+      },
+      async stop() {
+        throw new Error("not used")
+      },
+      async restart() {
+        throw new Error("not used")
+      },
+    },
+  })
+
+  const result = await executor.startTool("opencode-server")
+
+  expect(result).toEqual({
+    jobId: "start:opencode-server",
+    status: "failed",
+    message: "Docker container control failed: connect ENOENT /var/run/docker.sock",
+  })
+})
