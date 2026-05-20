@@ -1,11 +1,22 @@
 {$OPENCODE_REMOTE_DOMAIN} {
-  basicauth /* {
+  basic_auth /* {
     {$OPENCODE_REMOTE_BASIC_AUTH_USER} {$OPENCODE_REMOTE_BASIC_AUTH_PASSWORD_HASH}
   }
-  reverse_proxy 127.0.0.1:{$OPENCODE_PORT}
+  reverse_proxy management-ui:{$MANAGEMENT_UI_PORT}
+}
+
+opencode.{$OPENCODE_REMOTE_DOMAIN} {
+  basic_auth /* {
+    {$OPENCODE_REMOTE_BASIC_AUTH_USER} {$OPENCODE_REMOTE_BASIC_AUTH_PASSWORD_HASH}
+  }
+  reverse_proxy opencode:{$OPENCODE_PORT}
 }
 
 frp.{$OPENCODE_REMOTE_DOMAIN} {
-  reverse_proxy /rpc* 127.0.0.1:{$FRP_PANEL_RPC_PORT}
-  reverse_proxy 127.0.0.1:{$FRP_PANEL_API_PORT}
+  reverse_proxy /rpc* https://frp-panel:{$FRP_PANEL_RPC_PORT} {
+    transport http {
+      tls_insecure_skip_verify
+    }
+  }
+  reverse_proxy frp-panel:{$FRP_PANEL_API_PORT}
 }
