@@ -19,7 +19,8 @@
     "serve:management-ui": "bun run src/server/management-ui-server.ts",
     "tauri": "bunx @tauri-apps/cli",
     "build:desktop": "bun run build:ui && bunx @tauri-apps/cli build --config '{\"build\":{\"beforeBuildCommand\":\"\"}}'",
-    "lint": "bun run typecheck"
+    "lint": "bun run typecheck",
+    "verify": "bun test && bun run typecheck && bun run build && bun run build:ui && bun run build:server && bun run smoke"
   },
   "keywords": [
     "opencode",
