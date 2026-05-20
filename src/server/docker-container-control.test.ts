@@ -62,6 +62,42 @@ test("reports Docker API errors without throwing", async () => {
   expect(result).toEqual({ ok: false, message: "Docker returned HTTP 404: no such container" })
 })
 
+test("reads timestamped Docker container logs and redacts secrets", async () => {
+  const requests: Array<{ method: string; path: string }> = []
+  const controller = createDockerContainerController({
+    containerName: "opencode-remote-opencode",
+    transport: async (request) => {
+      requests.push(request)
+      return { statusCode: 200, body: "2026-05-21T00:00:00.000000000Z started token=secret-token\n" }
+    },
+  })
+
+  const result = await controller.logs()
+
+  expect(result).toEqual({
+    ok: true,
+    logs: [{ timestamp: "2026-05-21T00:00:00.000000000Z", level: "info", message: "started token=[REDACTED]" }],
+  })
+  expect(requests).toEqual([{ method: "GET", path: "/containers/opencode-remote-opencode/logs?stdout=true&stderr=true&timestamps=true&tail=200" }])
+})
+
+test("decodes Docker multiplexed log frames before parsing timestamps", async () => {
+  const controller = createDockerContainerController({
+    containerName: "opencode-remote-opencode",
+    transport: async () => ({
+      statusCode: 200,
+      body: createDockerLogFrame(1, "2026-05-21T00:00:00.000000000Z opencode server listening\n"),
+    }),
+  })
+
+  const result = await controller.logs()
+
+  expect(result).toEqual({
+    ok: true,
+    logs: [{ timestamp: "2026-05-21T00:00:00.000000000Z", level: "info", message: "opencode server listening" }],
+  })
+})
+
 test("fails closed when compose discovery finds no OpenCode container", async () => {
   const requests: Array<{ method: string; path: string }> = []
   const controller = createDockerContainerController({
@@ -129,3 +165,13 @@ test("fails closed when compose discovery returns invalid JSON", async () => {
   expect(result).toEqual({ ok: false, message: "Docker Compose service discovery failed: invalid Docker response body." })
   expect(requests).toHaveLength(1)
 })
+
+function createDockerLogFrame(stream: 1 | 2, payload: string): string {
+  const header = new Uint8Array(8)
+  header[0] = stream
+  header[4] = (payload.length >>> 24) & 0xff
+  header[5] = (payload.length >>> 16) & 0xff
+  header[6] = (payload.length >>> 8) & 0xff
+  header[7] = payload.length & 0xff
+  return `${String.fromCharCode(...header)}${payload}`
+}

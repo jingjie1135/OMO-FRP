@@ -1,14 +1,23 @@
 import { request as httpRequest } from "node:http"
+import type { LogLine } from "../management-api/types"
+import { redactSensitiveText } from "../shared/redact-sensitive-text"
 
 export interface DockerContainerActionResult {
   ok: boolean
   message: string
 }
 
+export interface DockerContainerLogsResult {
+  ok: boolean
+  logs: LogLine[]
+  message?: string
+}
+
 export interface DockerContainerController {
   start(): Promise<DockerContainerActionResult>
   stop(): Promise<DockerContainerActionResult>
   restart(): Promise<DockerContainerActionResult>
+  logs(): Promise<DockerContainerLogsResult>
 }
 
 export interface DockerTransportRequest {
@@ -54,6 +63,9 @@ export function createDockerContainerController(options: CreateDockerContainerCo
     },
     restart() {
       return runContainerAction(transport, getContainerTarget, "restart", `${displayName} container restarted.`)
+    },
+    logs() {
+      return readContainerLogs(transport, getContainerTarget)
     },
   }
 
@@ -117,6 +129,63 @@ function createDockerSocketTransport(socketPath: string): DockerTransport {
     clientRequest.on("error", reject)
     clientRequest.end()
   })
+}
+
+async function readContainerLogs(
+  transport: DockerTransport,
+  getContainerTarget: () => Promise<DockerContainerTarget>,
+): Promise<DockerContainerLogsResult> {
+  const target = await getContainerTarget()
+  if (!target.ok || !target.containerName) {
+    return { ok: false, logs: [], message: target.message ?? "Docker container target could not be resolved." }
+  }
+
+  const response = await transport({ method: "GET", path: `/containers/${encodeURIComponent(target.containerName)}/logs?stdout=true&stderr=true&timestamps=true&tail=200` })
+  if (response.statusCode < 200 || response.statusCode >= 300) {
+    return { ok: false, logs: [], message: `Docker returned HTTP ${response.statusCode}: ${getDockerErrorMessage(response.body)}` }
+  }
+
+  return { ok: true, logs: parseDockerLogs(response.body) }
+}
+
+function parseDockerLogs(body: string): LogLine[] {
+  return decodeDockerLogFrames(body)
+    .split("\n")
+    .filter((line) => line.trim())
+    .map((line) => {
+      const match = line.match(/^(\d{4}-\d{2}-\d{2}T\S+)\s+(.*)$/)
+      const timestamp = match?.[1] ?? new Date(0).toISOString()
+      const message = match?.[2] ?? line
+      return { timestamp, level: "info", message: redactSensitiveText(message) }
+    })
+}
+
+function decodeDockerLogFrames(body: string): string {
+  let offset = 0
+  let decoded = ""
+  while (isDockerLogFrameHeader(body, offset)) {
+    const length = readDockerFrameLength(body, offset)
+    const payloadStart = offset + 8
+    const payloadEnd = payloadStart + length
+    decoded += body.slice(payloadStart, payloadEnd)
+    offset = payloadEnd
+  }
+  return decoded ? `${decoded}${body.slice(offset)}` : body
+}
+
+function isDockerLogFrameHeader(body: string, offset: number): boolean {
+  if (offset + 8 > body.length) {
+    return false
+  }
+  const stream = body.charCodeAt(offset)
+  return (stream === 1 || stream === 2) && body.charCodeAt(offset + 1) === 0 && body.charCodeAt(offset + 2) === 0 && body.charCodeAt(offset + 3) === 0
+}
+
+function readDockerFrameLength(body: string, offset: number): number {
+  return ((body.charCodeAt(offset + 4) & 0xff) << 24)
+    | ((body.charCodeAt(offset + 5) & 0xff) << 16)
+    | ((body.charCodeAt(offset + 6) & 0xff) << 8)
+    | (body.charCodeAt(offset + 7) & 0xff)
 }
 
 async function runContainerAction(
