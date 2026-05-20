@@ -17,7 +17,7 @@ describe("AsyncActionStatus", () => {
       )
     })
     
-    expect(container.textContent).toContain("Processing...")
+    expect(container.textContent).toContain("处理中...")
     expect(container.querySelector('[role="status"]')).not.toBeNull()
   })
 
@@ -33,7 +33,7 @@ describe("AsyncActionStatus", () => {
       )
     })
     
-    expect(container.textContent).toContain("Success")
+    expect(container.textContent).toContain("已完成")
   })
 
   it("renders job state when provided", async () => {
@@ -49,7 +49,7 @@ describe("AsyncActionStatus", () => {
       )
     })
     
-    expect(container.textContent).toContain("Running job...")
+    expect(container.textContent).toContain("任务执行中...")
   })
 
   it("renders nothing for idle state", async () => {

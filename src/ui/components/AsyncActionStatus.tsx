@@ -11,13 +11,13 @@ export const AsyncActionStatus: React.FC<AsyncActionStatusProps> = ({ status, jo
 
   let message = ""
   if (status === "pending") {
-    if (jobStatus === "queued") message = "Queued..."
-    else if (jobStatus === "running") message = "Running job..."
-    else message = "Processing..."
+    if (jobStatus === "queued") message = "已进入队列..."
+    else if (jobStatus === "running") message = "任务执行中..."
+    else message = "处理中..."
   } else if (status === "succeeded") {
-    message = "Success"
+    message = "已完成"
   } else if (status === "failed") {
-    message = "Failed"
+    message = "失败"
   }
 
   return (

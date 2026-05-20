@@ -37,7 +37,7 @@ describe("ErrorState", () => {
     })
     
     const button = container.querySelector("button")
-    expect(button?.textContent).toBe("Retry")
+    expect(button?.textContent).toBe("重试")
     
     await act(async () => {
       button?.click()
@@ -58,6 +58,6 @@ describe("ErrorState", () => {
       )
     })
     
-    expect(container.textContent).toContain("Please sign in again")
+    expect(container.textContent).toContain("请重新登录")
   })
 })
