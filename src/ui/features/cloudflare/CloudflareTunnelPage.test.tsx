@@ -163,12 +163,16 @@ describe("Cloudflare Tunnel page", () => {
       />,
     )
 
-    expect(container.querySelector("h1")?.textContent).toContain("Cloudflare Tunnel Management")
-    expect(container.textContent).toContain("cloudflare:quick")
-    expect(container.textContent).toContain("Quick tunnel flow")
+    expect(container.querySelector("h1")?.textContent).toContain("Cloudflare Tunnel")
+    expect(container.querySelector('[data-testid="cloudflare-summary"]')?.getAttribute("data-cloudflare-mode")).toBe("quick")
+    expect(container.textContent).toContain("快速隧道流程")
     expect(container.textContent).toContain("http://127.0.0.1:4096")
     expect(container.textContent).toContain("https://blue-river.trycloudflare.com")
-    expect(container.textContent).toContain("cloudflared:detected")
+    expect(container.textContent).toContain("cloudflared：已检测")
+    expect(container.textContent).toContain("状态总览")
+    expect(container.textContent).toContain("快速隧道")
+    expect(container.textContent).toContain("后端自动启动待接入")
+    expect(container.textContent).toContain("手动执行命令")
     expect(container.textContent).toContain("cloudflared tunnel --url http://127.0.0.1:4096 --token <redacted>")
     expect(container.textContent).not.toContain("secret-token")
   })
@@ -227,10 +231,15 @@ describe("Cloudflare Tunnel page", () => {
       />,
     )
 
-    expect(container.textContent).toContain("cloudflare:named")
-    expect(container.textContent).toContain("Login")
-    expect(container.textContent).toContain("Create tunnel")
-    expect(container.textContent).toContain("Configure DNS")
+    expect(container.querySelector('[data-testid="cloudflare-summary"]')?.getAttribute("data-cloudflare-mode")).toBe("named")
+    expect(container.textContent).toContain("登录 Cloudflare")
+    expect(container.textContent).toContain("创建隧道")
+    expect(container.textContent).toContain("配置 DNS")
+    expect(container.textContent).toContain("写入配置")
+    expect(container.textContent).toContain("验证公网访问")
+    expect(container.textContent).toContain("cloudflared tunnel login")
+    expect(container.textContent).toContain("cloudflared tunnel create local-opencode")
+    expect(container.textContent).toContain("cloudflared tunnel route dns local-opencode opencode.example.com")
     expect(container.textContent).toContain("DNS route failed")
     expect(container.textContent).toContain("Check Cloudflare DNS permissions")
 
@@ -239,5 +248,77 @@ describe("Cloudflare Tunnel page", () => {
     })
 
     expect(retried).toEqual(["configure_dns"])
+  })
+
+  it("renders an explicit Cloudflare placeholder when backend plan data is missing", () => {
+    const container = render(
+      <CloudflareTunnelPage
+        runtimeInfo={{
+          ...runtimeInfo,
+          config: {
+            ...runtimeInfo.config,
+            toolInstances: runtimeInfo.config.toolInstances.filter((tool) => tool.kind !== "cloudflared"),
+          },
+        }}
+        status={{ mode: "unavailable", running: false, message: "Cloudflare status unavailable." }}
+        config={quickConfig}
+        saveConfig={async () => {}}
+        startTunnel={async () => {}}
+        stopTunnel={async () => {}}
+      />,
+    )
+
+    expect(container.textContent).toContain("后端能力占位")
+    expect(container.textContent).toContain("当前后端尚未返回完整 Cloudflare Tunnel 执行计划")
+    expect(container.textContent).toContain("cloudflared tunnel --url http://127.0.0.1:4096")
+    expect(container.textContent).toContain("保存隧道草稿")
+  })
+
+  it("redacts backend-sourced status, URL, top-level error, and action error text", () => {
+    const errorContainer = render(
+      <CloudflareTunnelPage
+        runtimeInfo={runtimeInfo}
+        status={quickStatus}
+        config={quickConfig}
+        error="cloudflared failed Authorization: Bearer raw-top-level-token OPENCODE_SERVER_PASSWORD=hunter2"
+      />,
+    )
+
+    expect(errorContainer.textContent).toContain("Authorization: Bearer <redacted>")
+    expect(errorContainer.textContent).toContain("OPENCODE_SERVER_PASSWORD=<redacted>")
+    expect(errorContainer.textContent).not.toContain("raw-top-level-token")
+    expect(errorContainer.textContent).not.toContain("hunter2")
+
+    const container = render(
+      <CloudflareTunnelPage
+        runtimeInfo={runtimeInfo}
+        status={{
+          mode: "quick",
+          running: false,
+          message: "cloudflared failed --token raw-status-token",
+          publicUrl: "https://blue-river.trycloudflare.com?token=raw-url-token",
+          failureReason: "password_missing",
+          suggestion: "set OPENCODE_SERVER_PASSWORD=raw-password before retry",
+        }}
+        config={quickConfig}
+        plan={{
+          ...quickPlan,
+          publicUrl: "https://blue-river.trycloudflare.com?token=raw-plan-token",
+          commandSummary: ["cloudflared tunnel --url http://127.0.0.1:4096 --token raw-command-token"],
+        }}
+        getActionStatus={(key) => key === "cloudflare:start" ? "failed" : "idle"}
+        getActionError={(key) => key === "cloudflare:start" ? { message: "Authorization: Bearer raw-action-token" } : undefined}
+      />,
+    )
+
+    expect(container.textContent).toContain("--token <redacted>")
+    expect(container.textContent).toContain("token=<redacted>")
+    expect(container.textContent).toContain("OPENCODE_SERVER_PASSWORD=<redacted>")
+    expect(container.textContent).toContain("Authorization: Bearer <redacted>")
+    expect(container.textContent).not.toContain("raw-status-token")
+    expect(container.textContent).not.toContain("raw-url-token")
+    expect(container.textContent).not.toContain("raw-plan-token")
+    expect(container.textContent).not.toContain("raw-password")
+    expect(container.textContent).not.toContain("raw-action-token")
   })
 })
