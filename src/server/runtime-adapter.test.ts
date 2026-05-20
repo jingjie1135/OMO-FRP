@@ -21,7 +21,11 @@ describe("persisted server runtime adapter", () => {
   it("loads real OpenCode detection from the server executor", async () => {
     const { root, restore } = await useTempStateRoot()
     const server = createServer((_request, response) => {
-      response.writeHead(200, { "access-control-allow-origin": "*", "content-type": "text/plain" })
+      response.writeHead(200, {
+        "access-control-allow-origin": "*",
+        connection: "close",
+        "content-type": "text/plain",
+      })
       response.end("ok")
     })
     await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve))
@@ -42,7 +46,7 @@ describe("persisted server runtime adapter", () => {
     } finally {
       if (previousUrl === undefined) delete process.env.OPENCODE_INTERNAL_URL
       else process.env.OPENCODE_INTERNAL_URL = previousUrl
-      server.close()
+      await new Promise<void>((resolve, reject) => server.close((error) => (error ? reject(error) : resolve())))
       restore()
     }
   })
@@ -77,7 +81,18 @@ describe("persisted server runtime adapter", () => {
 
   it("records jobs and logs for server executor actions", async () => {
     const { restore } = await useTempStateRoot()
+    const server = createServer((_request, response) => {
+      response.writeHead(200, { "access-control-allow-origin": "*", "content-type": "text/plain" })
+      response.end("ok")
+    })
+    await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve))
+    const address = server.address()
+    if (!address || typeof address === "string") {
+      throw new Error("HTTP test server did not expose a TCP port")
+    }
+    const previousUrl = process.env.OPENCODE_INTERNAL_URL
     try {
+      process.env.OPENCODE_INTERNAL_URL = `http://127.0.0.1:${address.port}`
       const adapter = await createPersistedServerRuntimeAdapter()
 
       const result = await adapter.startFrp()
@@ -88,6 +103,9 @@ describe("persisted server runtime adapter", () => {
       expect(diagnostics.jobs.some((job) => job.jobId === result.jobId)).toBe(true)
       expect(logs.some((line) => line.message.includes("FRP server execution is not connected yet"))).toBe(true)
     } finally {
+      if (previousUrl === undefined) delete process.env.OPENCODE_INTERNAL_URL
+      else process.env.OPENCODE_INTERNAL_URL = previousUrl
+      await new Promise<void>((resolve, reject) => server.close((error) => (error ? reject(error) : resolve())))
       restore()
     }
   })
