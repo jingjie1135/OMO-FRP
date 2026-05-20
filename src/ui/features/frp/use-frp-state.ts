@@ -169,37 +169,37 @@ export function useFrpState(client: ManagementClient, runner?: ActionRunner, ini
 
 export function validateFrpServerConfig(config: FrpServerConfig): FrpValidationResult {
   const issues: string[] = []
-  if (!isHttpUrl(config.panelUrl)) issues.push("Panel URL must be a valid URL.")
+  if (!isHttpUrl(config.panelUrl)) issues.push("Panel 地址必须是有效 URL。")
   if (!config.rpcUrl.trim()) {
-    issues.push("RPC URL is required.")
+    issues.push("RPC 地址不能为空。")
   } else if (!isHttpUrl(config.rpcUrl)) {
-    issues.push("RPC URL must be a valid URL.")
+    issues.push("RPC 地址必须是有效 URL。")
   }
-  if (!config.serverAddr.trim()) issues.push("Server address is required.")
-  if (!isValidPort(config.bindPort)) issues.push("Bind port must be between 1 and 65535.")
-  if (!config.authTokenRef.trim()) issues.push("Token reference is required.")
-  if (isMaskedTokenPlaceholder(config.authTokenRef)) issues.push("Replace the masked FRP token placeholder before saving.")
+  if (!config.serverAddr.trim()) issues.push("服务端地址不能为空。")
+  if (!isValidPort(config.bindPort)) issues.push("绑定端口必须在 1 到 65535 之间。")
+  if (!config.authTokenRef.trim()) issues.push("令牌引用不能为空。")
+  if (isMaskedTokenPlaceholder(config.authTokenRef)) issues.push("保存前请替换被遮罩的 FRP 令牌占位值。")
   if (config.authTokenRef.trim() && !isMaskedTokenPlaceholder(config.authTokenRef) && !isTokenReferenceName(config.authTokenRef)) {
-    issues.push("Token reference must use an environment-style name such as FRP_TOKEN.")
+    issues.push("令牌引用应使用类似 FRP_TOKEN 的环境变量名称。")
   }
   return createValidationResult(issues)
 }
 
 export function validateFrpClientConfig(config: FrpClientConfig, runtimeInfo?: RuntimeInfo): FrpValidationResult {
   const issues: string[] = []
-  if (!config.serverAddr.trim()) issues.push("Server address is required.")
-  if (!isValidPort(config.serverPort)) issues.push("Server port must be between 1 and 65535.")
-  if (!config.authTokenRef.trim()) issues.push("Token reference is required.")
-  if (isMaskedTokenPlaceholder(config.authTokenRef)) issues.push("Replace the masked FRP token placeholder before saving.")
+  if (!config.serverAddr.trim()) issues.push("服务端地址不能为空。")
+  if (!isValidPort(config.serverPort)) issues.push("服务端端口必须在 1 到 65535 之间。")
+  if (!config.authTokenRef.trim()) issues.push("令牌引用不能为空。")
+  if (isMaskedTokenPlaceholder(config.authTokenRef)) issues.push("保存前请替换被遮罩的 FRP 令牌占位值。")
   if (config.authTokenRef.trim() && !isMaskedTokenPlaceholder(config.authTokenRef) && !isTokenReferenceName(config.authTokenRef)) {
-    issues.push("Token reference must use an environment-style name such as FRP_TOKEN.")
+    issues.push("令牌引用应使用类似 FRP_TOKEN 的环境变量名称。")
   }
-  if (!isValidPort(config.localPort)) issues.push("Local port must be between 1 and 65535.")
+  if (!isValidPort(config.localPort)) issues.push("本地端口必须在 1 到 65535 之间。")
   if (!/^[-._a-zA-Z0-9]+$/.test(config.proxyName.trim())) {
-    issues.push("Proxy name can contain only letters, numbers, dots, underscores, and hyphens.")
+    issues.push("代理名称只能包含字母、数字、点、下划线和连字符。")
   }
   if (config.subdomain && !/^[-a-zA-Z0-9]+$/.test(config.subdomain)) {
-    issues.push("Subdomain can contain only letters, numbers, and hyphens.")
+    issues.push("子域名只能包含字母、数字和连字符。")
   }
 
   return createValidationResult(issues)
@@ -211,10 +211,10 @@ export function validateFrpClientStartConfig(config: FrpClientConfig, runtimeInf
 
   if (runtimeInfo) {
     const opencode = findTool(runtimeInfo, "opencode")
-    if (opencode?.status !== "running") issues.push("OpenCode must be running before frpc starts.")
-    if (!opencodePortReachable(opencode, config.localPort)) issues.push("Local OpenCode port must match a reachable configured port.")
+    if (opencode?.status !== "running") issues.push("启动 frpc 前必须先启动 OpenCode。")
+    if (!opencodePortReachable(opencode, config.localPort)) issues.push("本地 OpenCode 端口必须与一个可访问的已配置端口一致。")
     const frpc = findTool(runtimeInfo, "frpc")
-    if (!frpc || frpc.installState === "missing" || !frpc.binaryPath) issues.push("frpc binary must be installed before start.")
+    if (!frpc || frpc.installState === "missing" || !frpc.binaryPath) issues.push("启动前必须先安装 frpc 二进制。")
   }
 
   return createValidationResult(issues)
@@ -222,22 +222,22 @@ export function validateFrpClientStartConfig(config: FrpClientConfig, runtimeInf
 
 export function maskFrpTokenRef(tokenRef: string | undefined): string {
   const value = tokenRef?.trim()
-  if (!value) return "missing"
-  if (isMaskedTokenPlaceholder(value)) return "masked placeholder"
-  if (!isTokenReferenceName(value)) return "configured secret (masked)"
+  if (!value) return "缺失"
+  if (isMaskedTokenPlaceholder(value)) return "占位值已遮罩"
+  if (!isTokenReferenceName(value)) return "已配置密钥（已遮罩）"
   return `${value} (masked)`
 }
 
 export function getFrpFailureGuidance(reason: FrpFailureReason | undefined): string {
   switch (reason) {
     case "auth_failed":
-      return "Authentication failed. Verify the server and client use the same token reference and rotate the secret if needed."
+      return "认证失败。请确认服务端和客户端使用同一个令牌引用，并在必要时轮换密钥。"
     case "api_unreachable":
-      return "FRP panel API is unreachable. Check the panel URL, firewall rules, and service health."
+      return "FRP panel API 不可达。请检查 panel 地址、防火墙规则和服务健康状态。"
     case "rpc_unreachable":
-      return "FRP RPC endpoint is unreachable. Check the RPC URL, bind port, and network route."
+      return "FRP RPC 端点不可达。请检查 RPC 地址、绑定端口和网络路径。"
     case "proxy_not_ready":
-      return "The FRP proxy is not ready. Confirm the proxy name, public route, and remote port are available."
+      return "FRP 代理尚未就绪。请确认代理名称、公网路由和远端端口可用。"
     case "local_service_unreachable":
       return "The local OpenCode service is unreachable. Start OpenCode and verify the configured local port."
     case "client_not_ready":

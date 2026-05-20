@@ -283,11 +283,11 @@ describe("FRP state validation", () => {
     const result = validateFrpServerConfig({ ...serverConfig, panelUrl: "not-a-url", rpcUrl: "", serverAddr: "", bindPort: 70000, authTokenRef: "••••••" })
 
     expect(result.ok).toBe(false)
-    expect(result.issues.join(" ")).toContain("Panel URL must be a valid URL")
-    expect(result.issues.join(" ")).toContain("RPC URL is required")
-    expect(result.issues.join(" ")).toContain("Server address is required")
-    expect(result.issues.join(" ")).toContain("Bind port must be between 1 and 65535")
-    expect(result.issues.join(" ")).toContain("Replace the masked FRP token placeholder")
+    expect(result.issues.join(" ")).toContain("Panel 地址必须是有效 URL")
+    expect(result.issues.join(" ")).toContain("RPC 地址不能为空")
+    expect(result.issues.join(" ")).toContain("服务端地址不能为空")
+    expect(result.issues.join(" ")).toContain("绑定端口必须在 1 到 65535 之间")
+    expect(result.issues.join(" ")).toContain("保存前请替换被遮罩的 FRP 令牌占位值")
   })
 
   it("validates desktop client prerequisites before start", () => {
@@ -306,19 +306,19 @@ describe("FRP state validation", () => {
     )
 
     expect(result.ok).toBe(false)
-    expect(result.issues.join(" ")).toContain("OpenCode must be running")
-    expect(result.issues.join(" ")).toContain("frpc binary must be installed")
-    expect(result.issues.join(" ")).toContain("Server address is required")
-    expect(result.issues.join(" ")).toContain("Token reference is required")
-    expect(result.issues.join(" ")).toContain("Proxy name can contain only letters, numbers, dots, underscores, and hyphens")
+    expect(result.issues.join(" ")).toContain("启动 frpc 前必须先启动 OpenCode")
+    expect(result.issues.join(" ")).toContain("启动前必须先安装 frpc 二进制")
+    expect(result.issues.join(" ")).toContain("服务端地址不能为空")
+    expect(result.issues.join(" ")).toContain("令牌引用不能为空")
+    expect(result.issues.join(" ")).toContain("代理名称只能包含字母、数字、点、下划线和连字符")
   })
 
   it("masks token references, maps failure guidance, and generates frpc config without raw secrets", () => {
     expect(maskFrpTokenRef("FRP_TOKEN")).toBe("FRP_TOKEN (masked)")
-    expect(maskFrpTokenRef("••••••")).toBe("masked placeholder")
-    expect(maskFrpTokenRef("super-secret-token")).toBe("configured secret (masked)")
-    expect(getFrpFailureGuidance("auth_failed")).toContain("token reference")
-    expect(getFrpFailureGuidance("proxy_not_ready")).toContain("proxy")
+    expect(maskFrpTokenRef("••••••")).toBe("占位值已遮罩")
+    expect(maskFrpTokenRef("super-secret-token")).toBe("已配置密钥（已遮罩）")
+    expect(getFrpFailureGuidance("auth_failed")).toContain("令牌引用")
+    expect(getFrpFailureGuidance("proxy_not_ready")).toContain("代理")
 
     const generated = buildGeneratedFrpcConfig(clientConfig)
     expect(generated).toContain("serverAddr = \"frp.example.com\"")
@@ -329,7 +329,7 @@ describe("FRP state validation", () => {
     const generatedFromRawToken = buildGeneratedFrpcConfig({ ...clientConfig, authTokenRef: "super-secret-token" })
     expect(generatedFromRawToken).toContain("token = \"${FRP_TOKEN}\"")
     expect(generatedFromRawToken).not.toContain("super-secret-token")
-    expect(validateFrpClientConfig({ ...clientConfig, authTokenRef: "super-secret-token" }).issues.join(" ")).toContain("environment-style name")
+    expect(validateFrpClientConfig({ ...clientConfig, authTokenRef: "super-secret-token" }).issues.join(" ")).toContain("类似 FRP_TOKEN 的环境变量名称")
   })
 })
 
@@ -378,7 +378,7 @@ describe("useFrpState", () => {
       })
     })
 
-    expect(message).toContain("OpenCode must be running")
+    expect(message).toContain("启动 frpc 前必须先启动 OpenCode")
     expect(fake.calls.startFrp).toBe(0)
     expect(probe.current().status?.running).toBe(false)
   })
@@ -440,6 +440,6 @@ describe("useFrpState", () => {
     })
 
     expect(message).toContain("authentication failed")
-    expect(message).toContain("token reference")
+    expect(message).toContain("令牌引用")
   })
 })

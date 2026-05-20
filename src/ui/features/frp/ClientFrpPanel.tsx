@@ -95,20 +95,20 @@ export function ClientFrpPanel(state: ClientFrpPanelState) {
           <input name="proxyName" value={draft.proxyName} onChange={(event) => setDraft({ ...draft, proxyName: event.currentTarget.value })} className="w-full rounded border p-2" />
         </label>
         <label className="space-y-1">
-          <span className="font-medium">Subdomain</span>
+          <span className="font-medium">子域名</span>
           <input name="subdomain" value={draft.subdomain ?? ""} onChange={(event) => setDraft({ ...draft, subdomain: event.currentTarget.value || undefined })} className="w-full rounded border p-2" />
         </label>
         <label className="space-y-1 md:col-span-2">
-          <span className="font-medium">Imported connection config</span>
+          <span className="font-medium">导入连接配置</span>
           <textarea name="connectionConfig" value={connectionConfig} onChange={(event) => setConnectionConfig(event.currentTarget.value)} className="w-full rounded border p-2" rows={3} />
         </label>
-        <button type="button" data-testid="import-frp-client-config" onClick={() => setDraft(importClientConfigDraft(draft, connectionConfig))} className="px-3 py-2 rounded bg-slate-600 text-white">Import connection config</button>
-        <button type="submit" disabled={!state.saveConfig || !saveValidation.ok || actionPending} className="px-3 py-2 rounded bg-blue-600 text-white disabled:bg-gray-300">Save client config</button>
+        <button type="button" data-testid="import-frp-client-config" onClick={() => setDraft(importClientConfigDraft(draft, connectionConfig))} className="px-3 py-2 rounded bg-slate-600 text-white">导入连接配置</button>
+        <button type="submit" disabled={!state.saveConfig || !saveValidation.ok || actionPending} className="px-3 py-2 rounded bg-blue-600 text-white disabled:bg-gray-300">保存客户端配置</button>
       </form>
       {!startValidation.ok && <p className="text-sm text-amber-700 bg-amber-50 border border-amber-200 rounded p-2">{startValidation.issues.join(" ")}</p>}
       <div className="flex flex-wrap gap-2 items-center">
-        <button type="button" disabled={!state.startFrp || !startValidation.ok || actionPending || state.status.running} onClick={() => void state.startFrp?.()} className="px-3 py-2 rounded bg-green-600 text-white disabled:bg-gray-300">Start frpc</button>
-        <button type="button" disabled={!state.stopFrp || actionPending || !state.status.running} onClick={() => void state.stopFrp?.()} className="px-3 py-2 rounded bg-red-600 text-white disabled:bg-gray-300">Stop frpc</button>
+        <button type="button" disabled={!state.startFrp || !startValidation.ok || actionPending || state.status.running} onClick={() => void state.startFrp?.()} className="px-3 py-2 rounded bg-green-600 text-white disabled:bg-gray-300">启动 frpc</button>
+        <button type="button" disabled={!state.stopFrp || actionPending || !state.status.running} onClick={() => void state.stopFrp?.()} className="px-3 py-2 rounded bg-red-600 text-white disabled:bg-gray-300">停止 frpc</button>
         <AsyncActionStatus status={startStatus === "idle" ? stopStatus : startStatus} />
       </div>
       {saveError && <ErrorState error={saveError} onRetry={() => void state.saveConfig?.(draft)} />}
