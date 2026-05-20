@@ -2,11 +2,12 @@ import { afterEach, describe, expect, it } from "bun:test"
 import { act } from "react"
 import { createRoot, type Root } from "react-dom/client"
 import type { ManagementClient } from "../../management-api/client"
-import type { Diagnostics, FrpStatus, JobResult, RuntimeInfo } from "../../management-api/types"
+import type { ConfigTarget, Diagnostics, FrpStatus, JobResult, RuntimeInfo } from "../../management-api/types"
 import type { DashboardViewModel } from "../features/dashboard/dashboard-view-model"
 import { ManagementDashboardApp } from "./ManagementDashboardApp"
 
 const mountedRoots: Root[] = []
+type TestManagementClient = ManagementClient & { configTargets: ConfigTarget[] }
 
 afterEach(() => {
   for (const root of mountedRoots.splice(0)) {
@@ -15,7 +16,7 @@ afterEach(() => {
   document.body.innerHTML = ""
 })
 
-function createDashboard(message: string): DashboardViewModel {
+function createDashboard(message: string, logMessage = "OpenCode started"): DashboardViewModel {
   return {
     runtimeInfo: {
       capabilities: {
@@ -47,13 +48,14 @@ function createDashboard(message: string): DashboardViewModel {
       },
     },
     frpStatus: { mode: "server", running: true, message },
-    logs: [{ timestamp: "2026-05-14T10:00:00.000Z", level: "info", message: "OpenCode started" }],
+    logs: [{ timestamp: "2026-05-14T10:00:00.000Z", level: "info", message: logMessage }],
   }
 }
 
-function createClient(results: Array<DashboardViewModel | Error>): ManagementClient {
+function createClient(results: Array<DashboardViewModel | Error>): TestManagementClient {
   let callIndex = 0
   const successJob: JobResult = { jobId: "settings", status: "succeeded", message: "ok" }
+  const configTargets: ConfigTarget[] = []
 
   const getCurrentRuntimeInfo = (): RuntimeInfo => {
     const result = results[Math.min(callIndex, results.length - 1)]
@@ -73,7 +75,7 @@ function createClient(results: Array<DashboardViewModel | Error>): ManagementCli
 
   const getCurrentDiagnostics = (): Diagnostics => ({ runtime: getCurrentRuntimeInfo(), tools: [], endpoints: [], frp: getCurrentFrpStatus(), jobs: [], redactedLogs: [] })
 
-  return {
+  const client: ManagementClient = {
     async getRuntimeInfo() {
       const result = results[Math.min(callIndex, results.length - 1)]
       if (result instanceof Error) throw result
@@ -108,18 +110,21 @@ function createClient(results: Array<DashboardViewModel | Error>): ManagementCli
     async restartTool() {
       return { jobId: "restart", status: "succeeded", message: "restarted" }
     },
-    async readConfig() {
-      return { target: { toolInstanceId: "opencode-server", kind: "opencode" }, content: "" }
+    async readConfig(target) {
+      configTargets.push(target)
+      return { target, content: `content for ${target.toolInstanceId}:${target.kind}` }
     },
     async validateConfig() {
       return { valid: true, fieldErrors: [] }
     },
     async saveConfig() {},
-    async listPresets() {
+    async listPresets(target) {
+      configTargets.push(target)
       return []
     },
     async applyPreset() {},
-    async listBackups() {
+    async listBackups(target) {
+      configTargets.push(target)
       return []
     },
     async restoreBackup() {},
@@ -162,6 +167,8 @@ function createClient(results: Array<DashboardViewModel | Error>): ManagementCli
     async cleanupOldBackups() { return successJob },
     async getDiagnostics() { return getCurrentDiagnostics() },
   }
+
+  return Object.assign(client, { configTargets })
 }
 
 async function renderApp(client: ManagementClient) {
@@ -205,14 +212,117 @@ describe("ManagementDashboardApp", () => {
   it("renders the shell navigation, runtime badge, and dashboard content", async () => {
     const container = await renderApp(createClient([createDashboard("FRP server is running.")]))
 
-    expect(container.textContent).toContain("OpenCode Remote")
+    expect(container.textContent).toContain("FOMO")
+    expect(container.querySelector('[title="FRP-Oh-My-OpenCode"]')?.textContent).toContain("FOMO")
+    expect(container.textContent).toContain("v1.2.0-beta")
     expect(container.textContent).toContain("主控台")
     expect(container.textContent).toContain("工具管理")
     expect(container.textContent).toContain("公网入口")
-    expect(container.textContent).toContain("Cloudflare Tunnel")
+    expect(container.textContent).toContain("Cloudflare 隧道")
     expect(container.textContent).toContain("服务器模式")
+    expect(container.textContent).toContain("系统在线")
     expect(container.textContent).toContain("FRP server is running.")
     expect(container.textContent).toContain("OpenCode started")
+  })
+
+  it("switches sidebar tabs to render the selected management page", async () => {
+    const container = await renderApp(createClient([createDashboard("FRP server is running.")]))
+    const toolsTab = Array.from(container.querySelectorAll("button")).find((button) => button.textContent?.includes("工具管理"))
+
+    expect(toolsTab).toBeDefined()
+    await act(async () => toolsTab?.dispatchEvent(new MouseEvent("click", { bubbles: true })))
+    await act(async () => {})
+
+    expect(container.textContent).toContain("工具管理")
+    expect(container.textContent).toContain("工具检测结果")
+    expect(container.textContent).not.toContain("FRP server is running.")
+  })
+
+  it("renders localized management page titles when switching tabs", async () => {
+    const container = await renderApp(createClient([createDashboard("FRP server is running.")]))
+
+    const clickTab = async (label: string) => {
+      const tab = Array.from(container.querySelectorAll("button")).find((button) => button.textContent?.includes(label))
+      expect(tab).toBeDefined()
+      await act(async () => tab?.dispatchEvent(new MouseEvent("click", { bubbles: true })))
+      await act(async () => {})
+    }
+
+    await clickTab("工具管理")
+    expect(container.textContent).toContain("工具管理")
+    expect(container.textContent).not.toContain("Tools Management")
+
+    await clickTab("公网入口")
+    expect(container.textContent).toContain("公网入口")
+    expect(container.textContent).not.toContain("Endpoints")
+
+    await clickTab("配置与备份")
+    expect(container.textContent).toContain("配置与备份")
+    expect(container.textContent).not.toContain("Configuration Editor")
+
+    await clickTab("日志")
+    expect(container.textContent).toContain("系统日志")
+    expect(container.textContent).toContain("清空日志")
+    expect(container.textContent).toContain("导出日志")
+    expect(container.textContent).toContain("/var/log/opencode/system.log")
+  })
+
+  it("loads config page data from a real tool instance when opened in the dashboard shell", async () => {
+    const client = createClient([createDashboard("FRP server is running.")]) as ManagementClient & { configTargets: ConfigTarget[] }
+    const container = await renderApp(client)
+    const configTab = Array.from(container.querySelectorAll("button")).find((button) => button.textContent?.includes("配置与备份"))
+
+    expect(configTab).toBeDefined()
+    await act(async () => configTab?.dispatchEvent(new MouseEvent("click", { bubbles: true })))
+    await act(async () => {})
+
+    expect(container.textContent).toContain("content for opencode-server:opencode")
+    expect(client.configTargets.map((target) => `${target.toolInstanceId}:${target.kind}`)).toContain("opencode-server:opencode")
+    expect(client.configTargets.map((target) => target.toolInstanceId)).not.toContain("unknown")
+  })
+
+  it("redacts sensitive values in the logs page", async () => {
+    const client = createClient([createDashboard("FRP server is running.", "Authorization: Bearer raw-log-token token=client-secret password=Strong-password-123!")])
+    const container = await renderApp(client)
+    const logsTab = Array.from(container.querySelectorAll("button")).find((button) => button.textContent?.includes("日志"))
+
+    expect(logsTab).toBeDefined()
+    await act(async () => logsTab?.dispatchEvent(new MouseEvent("click", { bubbles: true })))
+    await act(async () => {})
+
+    expect(container.textContent).toContain("Authorization: Bearer [REDACTED]")
+    expect(container.textContent).toContain("token=[REDACTED]")
+    expect(container.textContent).toContain("password=[REDACTED]")
+    expect(container.textContent).not.toContain("raw-log-token")
+    expect(container.textContent).not.toContain("client-secret")
+    expect(container.textContent).not.toContain("Strong-password-123")
+  })
+
+  it("uses fomo quick actions to switch from the dashboard into feature pages", async () => {
+    const container = await renderApp(createClient([createDashboard("FRP server is running.")]))
+
+    const openFrp = Array.from(container.querySelectorAll("button")).find((button) => button.textContent?.includes("更新 FRP 隧道"))
+    expect(openFrp).toBeDefined()
+
+    await act(async () => openFrp?.dispatchEvent(new MouseEvent("click", { bubbles: true })))
+    await act(async () => {})
+
+    expect(container.textContent).toContain("FRP 穿透")
+    expect(container.textContent).toContain("断开连接")
+
+    const dashboardTab = Array.from(container.querySelectorAll("button")).find((button) => button.textContent?.includes("主控台"))
+    expect(dashboardTab).toBeDefined()
+    await act(async () => dashboardTab?.dispatchEvent(new MouseEvent("click", { bubbles: true })))
+    await act(async () => {})
+
+    const openSecurity = Array.from(container.querySelectorAll("button")).find((button) => button.textContent?.includes("查看入口安全"))
+    expect(openSecurity).toBeDefined()
+
+    await act(async () => openSecurity?.dispatchEvent(new MouseEvent("click", { bubbles: true })))
+    await act(async () => {})
+
+    expect(container.textContent).toContain("公网入口")
+    expect(container.textContent).toContain("入口校验")
   })
 
   it("shows an initial load failure with retry affordance", async () => {
@@ -233,5 +343,30 @@ describe("ManagementDashboardApp", () => {
 
     expect(container.textContent).toContain("ready")
     expect(container.textContent).toContain("refresh failed")
+  })
+
+  it("leaves a stale Cloudflare page when tunnel capability is removed on refresh", async () => {
+    const enabledDashboard = createDashboard("Cloudflare enabled")
+    const disabledDashboard = createDashboard("Cloudflare disabled")
+    disabledDashboard.runtimeInfo.capabilities.canManageCloudflareTunnel = false
+    const client = createClient([enabledDashboard, disabledDashboard])
+    const container = await renderApp(client)
+
+    const cloudflareTab = Array.from(container.querySelectorAll("button")).find((button) => button.textContent?.includes("Cloudflare 隧道"))
+    expect(cloudflareTab).toBeDefined()
+    await act(async () => cloudflareTab?.dispatchEvent(new MouseEvent("click", { bubbles: true })))
+    await act(async () => {})
+
+    expect(container.textContent).toContain("Cloudflare Tunnel")
+
+    const refreshButton = Array.from(container.querySelectorAll("button")).find((button) => button.textContent?.includes("刷新"))
+    expect(refreshButton).toBeDefined()
+    await act(async () => refreshButton?.dispatchEvent(new MouseEvent("click", { bubbles: true })))
+    await act(async () => {})
+
+    expect(container.textContent).not.toContain("Cloudflare Tunnel")
+    expect(container.textContent).not.toContain("Cloudflare 隧道")
+    expect(container.textContent).toContain("主控台")
+    expect(container.textContent).toContain("Cloudflare disabled")
   })
 })
