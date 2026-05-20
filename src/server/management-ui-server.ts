@@ -1,5 +1,6 @@
 import { extname, join, relative, resolve } from "node:path"
 import { createServerApi, type ServerApi } from "./api"
+import { createPersistedServerRuntimeAdapter } from "./runtime-adapter"
 
 export interface ManagementUiRequestHandlerOptions {
   staticRoot?: string
@@ -12,13 +13,19 @@ const defaultStaticRoot = resolve(process.cwd(), "dist", "ui")
 
 export function createManagementUiRequestHandler(options: ManagementUiRequestHandlerOptions = {}): ManagementUiRequestHandler {
   const staticRoot = resolve(options.staticRoot ?? defaultStaticRoot)
-  const api = options.api ?? createServerApi({ sessionToken: process.env.MANAGEMENT_API_SESSION_TOKEN })
+  const api = options.api
+  const apiPromise = api
+    ? Promise.resolve(api)
+    : createPersistedServerRuntimeAdapter().then((adapter) => createServerApi({
+      adapter,
+      sessionToken: process.env.MANAGEMENT_API_SESSION_TOKEN,
+    }))
 
   return async function handleManagementUiRequest(request: Request): Promise<Response> {
     const url = new URL(request.url)
 
     if (url.pathname.startsWith("/api/")) {
-      return api.request(`${url.pathname}${url.search}`, await toRequestInit(request))
+      return (await apiPromise).request(`${url.pathname}${url.search}`, await toRequestInit(request))
     }
 
     if (isAssetRequest(url.pathname)) {

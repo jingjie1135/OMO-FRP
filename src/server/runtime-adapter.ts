@@ -1,4 +1,9 @@
+import { readdir } from "node:fs/promises"
+import { join, relative, resolve } from "node:path"
 import { SERVER_CAPABILITIES, type AppConfig, type RuntimeInfo } from "../core/app-config/types"
+import { NodeStorage } from "../core/storage/node-storage"
+import type { StorageAdapter } from "../core/storage/storage-adapter"
+import type { RuntimeExecutor } from "../management-api/runtime-executor"
 import type {
   ConfigBackup,
   ConfigDocument,
@@ -21,8 +26,12 @@ import type {
   Diagnostics,
 } from "../management-api/types"
 import { createLocalManagementRuntime } from "../management-api/local-management-runtime"
+import { appendJobRecord, readJobRecords } from "./job-store"
+import { appendRuntimeLog, readRuntimeLogs } from "./log-store"
 import { createServerRuntimePaths } from "./server-runtime-paths"
-import { loadServerAppConfig } from "./server-runtime-state"
+import type { ServerRuntimePaths } from "./server-runtime-paths"
+import { createServerRuntimeExecutor } from "./server-runtime-executor"
+import { loadServerAppConfig, saveServerAppConfig } from "./server-runtime-state"
 
 export interface ServerRuntimeAdapter {
   getRuntimeInfo(): Promise<RuntimeInfo>
@@ -62,19 +71,32 @@ export interface ServerRuntimeAdapter {
 }
 
 
-export function createServerRuntimeAdapter(config: AppConfig = createEmptyServerConfig()): ServerRuntimeAdapter {
+export interface CreateServerRuntimeAdapterOptions {
+  defaultConfigDirectory?: string
+  storage?: StorageAdapter
+  executor?: RuntimeExecutor
+}
+
+export function createServerRuntimeAdapter(config: AppConfig = createEmptyServerConfig(), options: CreateServerRuntimeAdapterOptions = {}): ServerRuntimeAdapter {
   return createLocalManagementRuntime({
     capabilities: SERVER_CAPABILITIES,
     config,
-    defaultConfigDirectory: "/opt/opencode-remote-platform/config",
+    defaultConfigDirectory: options.defaultConfigDirectory ?? "/opt/opencode-remote-platform/config",
     frpStatusMode: "server",
+    storage: options.storage,
+    executor: options.executor,
   })
 }
 
 export async function createPersistedServerRuntimeAdapter(): Promise<ServerRuntimeAdapter> {
   const paths = createServerRuntimePaths()
   const config = await loadServerAppConfig(paths.appConfigPath)
-  return createServerRuntimeAdapter(config)
+  const adapter = createServerRuntimeAdapter(config, {
+    defaultConfigDirectory: paths.configDirectory,
+    storage: new NodeStorage(),
+    executor: createServerRuntimeExecutor(),
+  })
+  return createDurableServerRuntimeAdapter(adapter, paths)
 }
 
 export function createEmptyServerConfig(): AppConfig {
@@ -85,4 +107,119 @@ export function createEmptyServerConfig(): AppConfig {
     publicEndpoints: [],
     frpClients: [],
   }
+}
+
+function createDurableServerRuntimeAdapter(adapter: ServerRuntimeAdapter, paths: ServerRuntimePaths): ServerRuntimeAdapter {
+  async function persistConfig(): Promise<void> {
+    const runtime = await adapter.getRuntimeInfo()
+    await saveServerAppConfig(paths.appConfigPath, runtime.config)
+  }
+
+  async function recordJob(action: string, targetId: string, result: JobResult): Promise<JobResult> {
+    const timestamp = new Date().toISOString()
+    await appendJobRecord(paths.jobsPath, {
+      ...result,
+      action,
+      targetId,
+      createdAt: timestamp,
+      updatedAt: timestamp,
+    })
+    await appendRuntimeLog(createLogPath(paths, targetId), {
+      timestamp,
+      level: result.status === "failed" ? "error" : "info",
+      message: result.message,
+    })
+    return result
+  }
+
+  async function withPersistedConfig<T>(operation: () => Promise<T>): Promise<T> {
+    const result = await operation()
+    await persistConfig()
+    return result
+  }
+
+  return {
+    async getRuntimeInfo() { return adapter.getRuntimeInfo() },
+    async detectTools() { return adapter.detectTools() },
+    async listToolInstances() { return adapter.listToolInstances() },
+    async installTool(request) { return recordJob("install", request.kind, await withPersistedConfig(() => adapter.installTool(request))) },
+    async startTool(instanceId) { return recordJob("start", instanceId, await adapter.startTool(instanceId)) },
+    async stopTool(instanceId) { return recordJob("stop", instanceId, await adapter.stopTool(instanceId)) },
+    async restartTool(instanceId) { return recordJob("restart", instanceId, await adapter.restartTool(instanceId)) },
+    async getToolLogs(instanceId) { return readRuntimeLogs(createLogPath(paths, instanceId)) },
+    async readConfig(target) { return adapter.readConfig(constrainConfigTarget(paths, target)) },
+    async validateConfig(target, content) { return adapter.validateConfig(constrainConfigTarget(paths, target), content) },
+    async saveConfig(target, content) { await withPersistedConfig(() => adapter.saveConfig(constrainConfigTarget(paths, target), content)) },
+    async listPresets(target) { return adapter.listPresets(constrainConfigTarget(paths, target)) },
+    async applyPreset(target, presetId) { await withPersistedConfig(() => adapter.applyPreset(constrainConfigTarget(paths, target), presetId)) },
+    async listBackups(target) { return adapter.listBackups(constrainConfigTarget(paths, target)) },
+    async restoreBackup(target, backupId) { await withPersistedConfig(() => adapter.restoreBackup(constrainConfigTarget(paths, target), backupId)) },
+    async listEndpoints() { return adapter.listEndpoints() },
+    async saveEndpoint(endpoint) { await withPersistedConfig(() => adapter.saveEndpoint(endpoint)) },
+    async enableEndpoint(id) { return recordJob("enable-endpoint", id, await withPersistedConfig(() => adapter.enableEndpoint(id))) },
+    async disableEndpoint(id) { return recordJob("disable-endpoint", id, await withPersistedConfig(() => adapter.disableEndpoint(id))) },
+    async getFrpStatus() { return adapter.getFrpStatus() },
+    async saveFrpConfig(config) { await withPersistedConfig(() => adapter.saveFrpConfig(config)) },
+    async startFrp() { return recordJob("start-frp", "frp", await adapter.startFrp()) },
+    async stopFrp() { return recordJob("stop-frp", "frp", await adapter.stopFrp()) },
+    async getCloudflareTunnelStatus() { return adapter.getCloudflareTunnelStatus() },
+    async saveCloudflareTunnelConfig(config) { await withPersistedConfig(() => adapter.saveCloudflareTunnelConfig(config)) },
+    async createCloudflareTunnelPlan(config) { return adapter.createCloudflareTunnelPlan(config) },
+    async startCloudflareTunnel(config) { return recordJob("start-cloudflare", "cloudflare", await adapter.startCloudflareTunnel(config)) },
+    async stopCloudflareTunnel() { return recordJob("stop-cloudflare", "cloudflare", await adapter.stopCloudflareTunnel()) },
+    async retryCloudflareTunnelStep(stepId) { return recordJob("retry-cloudflare", "cloudflare", await adapter.retryCloudflareTunnelStep(stepId)) },
+    async getSecurityChecks() { return adapter.getSecurityChecks() },
+    async getBackupSummary() { return adapter.getBackupSummary() },
+    async runManualBackup() { return recordJob("manual-backup", "settings", await adapter.runManualBackup()) },
+    async cleanupOldBackups() { return recordJob("cleanup-backups", "settings", await adapter.cleanupOldBackups()) },
+    async getDiagnostics() {
+      const diagnostics = await adapter.getDiagnostics()
+      return {
+        ...diagnostics,
+        jobs: await readJobRecords(paths.jobsPath),
+        redactedLogs: [...diagnostics.redactedLogs, ...await readAllRuntimeLogs(paths.logDirectory)],
+      }
+    },
+  }
+}
+
+function constrainConfigTarget(paths: ServerRuntimePaths, target: ConfigTarget): ConfigTarget {
+  if (!target.path) {
+    return target
+  }
+
+  const root = resolve(paths.configDirectory)
+  const resolvedPath = resolve(target.path)
+  const relativePath = relative(root, resolvedPath)
+  if (relativePath.startsWith("..") || relativePath.includes(":")) {
+    throw new Error(`Config target path must stay under ${paths.configDirectory}`)
+  }
+  return { ...target, path: resolvedPath }
+}
+
+async function readAllRuntimeLogs(logDirectory: string): Promise<LogLine[]> {
+  let entries: string[]
+  try {
+    entries = await readdir(logDirectory)
+  } catch (error) {
+    if (isMissingFileError(error)) {
+      return []
+    }
+    throw error
+  }
+
+  const logs = await Promise.all(
+    entries
+      .filter((entry) => entry.endsWith(".log"))
+      .map((entry) => readRuntimeLogs(join(logDirectory, entry))),
+  )
+  return logs.flat()
+}
+
+function createLogPath(paths: ServerRuntimePaths, targetId: string): string {
+  return join(paths.logDirectory, `${targetId.replace(/[^a-z0-9._-]/gi, "-")}.log`)
+}
+
+function isMissingFileError(error: unknown): boolean {
+  return Boolean(error && typeof error === "object" && "code" in error && error.code === "ENOENT")
 }

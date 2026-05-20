@@ -79,6 +79,10 @@ export function createLocalManagementRuntime(options: CreateLocalManagementRunti
     },
 
     async detectTools(): Promise<ToolDetection[]> {
+      if (options.executor) {
+        return options.executor.detectTools()
+      }
+
       return state.config.toolInstances.map((tool) => ({
         kind: tool.kind,
         displayName: tool.displayName,
@@ -94,6 +98,10 @@ export function createLocalManagementRuntime(options: CreateLocalManagementRunti
     },
 
     async installTool(request: InstallToolRequest): Promise<JobResult> {
+      if (options.executor) {
+        return options.executor.installTool(request)
+      }
+
       const existing = state.config.toolInstances.find((tool) => tool.kind === request.kind)
       if (existing) {
         existing.installState = existing.installState === "configured" ? "configured" : "installed"
@@ -128,6 +136,10 @@ export function createLocalManagementRuntime(options: CreateLocalManagementRunti
     },
 
     async stopTool(instanceId: string): Promise<JobResult> {
+      if (options.executor) {
+        return options.executor.stopTool(instanceId)
+      }
+
       const tool = state.config.toolInstances.find((item) => item.id === instanceId)
       if (!tool) {
         return createJobResult("stop", instanceId, "failed", `Unknown tool instance: ${instanceId}`)
@@ -139,6 +151,10 @@ export function createLocalManagementRuntime(options: CreateLocalManagementRunti
     },
 
     async restartTool(instanceId: string): Promise<JobResult> {
+      if (options.executor) {
+        return options.executor.restartTool(instanceId)
+      }
+
       const stopResult = await this.stopTool(instanceId)
       if (stopResult.status === "failed") {
         return stopResult
@@ -147,6 +163,10 @@ export function createLocalManagementRuntime(options: CreateLocalManagementRunti
     },
 
     async getToolLogs(instanceId: string): Promise<LogLine[]> {
+      if (options.executor) {
+        return options.executor.getToolLogs(instanceId)
+      }
+
       return cloneValue(state.logs.get(instanceId) ?? [])
     },
 
@@ -298,6 +318,10 @@ export function createLocalManagementRuntime(options: CreateLocalManagementRunti
     },
 
     async getFrpStatus(): Promise<FrpStatus> {
+      if (options.executor) {
+        return options.executor.getFrpStatus()
+      }
+
       return {
         mode: options.frpStatusMode,
         running: state.frpRunning,
@@ -313,13 +337,19 @@ export function createLocalManagementRuntime(options: CreateLocalManagementRunti
         } else {
           state.config.frpClients.push(cloneValue(config))
         }
+        await options.executor?.saveFrpConfig(config)
         return
       }
 
       state.config.frpServer = cloneValue(config)
+      await options.executor?.saveFrpConfig(config)
     },
 
     async startFrp(): Promise<JobResult> {
+      if (options.executor) {
+        return options.executor.startFrp()
+      }
+
       if (options.frpStatusMode === "server" && !state.config.frpServer) {
         return createJobResult("start-frp", "frp", "failed", "FRP server configuration is missing.")
       }
@@ -337,6 +367,10 @@ export function createLocalManagementRuntime(options: CreateLocalManagementRunti
     },
 
     async stopFrp(): Promise<JobResult> {
+      if (options.executor) {
+        return options.executor.stopFrp()
+      }
+
       state.frpRunning = false
       return createJobResult(
         "stop-frp",
@@ -347,6 +381,10 @@ export function createLocalManagementRuntime(options: CreateLocalManagementRunti
     },
 
     async getCloudflareTunnelStatus(): Promise<CloudflareTunnelStatus> {
+      if (options.executor) {
+        return options.executor.getCloudflareTunnelStatus()
+      }
+
       const config = state.cloudflareConfig ?? createDefaultCloudflareConfig(state.config)
       return {
         mode: config.mode,
@@ -359,13 +397,22 @@ export function createLocalManagementRuntime(options: CreateLocalManagementRunti
 
     async saveCloudflareTunnelConfig(config: CloudflareTunnelConfigRequest): Promise<void> {
       state.cloudflareConfig = cloneValue(config)
+      await options.executor?.saveCloudflareTunnelConfig(config)
     },
 
     async createCloudflareTunnelPlan(config: CloudflareTunnelConfigRequest): Promise<CloudflareTunnelPlan> {
+      if (options.executor) {
+        return options.executor.createCloudflareTunnelPlan(config)
+      }
+
       return createCloudflarePlan(config, state.config.toolInstances)
     },
 
     async startCloudflareTunnel(config: CloudflareTunnelConfigRequest): Promise<JobResult> {
+      if (options.executor) {
+        return options.executor.startCloudflareTunnel(config)
+      }
+
       const opencode = state.config.toolInstances.find((tool) => tool.kind === "opencode")
       if (opencode?.status !== "running") {
         return createJobResult("start-cloudflare", "cloudflare", "failed", "OpenCode must be running before cloudflared starts.")
@@ -389,11 +436,19 @@ export function createLocalManagementRuntime(options: CreateLocalManagementRunti
     },
 
     async stopCloudflareTunnel(): Promise<JobResult> {
+      if (options.executor) {
+        return options.executor.stopCloudflareTunnel()
+      }
+
       state.cloudflareRunning = false
       return createJobResult("stop-cloudflare", "cloudflare", "succeeded", "Cloudflare Tunnel has been stopped.")
     },
 
     async retryCloudflareTunnelStep(stepId: CloudflareTunnelStepId): Promise<JobResult> {
+      if (options.executor) {
+        return options.executor.retryCloudflareTunnelStep(stepId)
+      }
+
       return createJobResult("retry-cloudflare", stepId, "succeeded", `Cloudflare Tunnel step ${stepId} was retried.`)
     },
 
