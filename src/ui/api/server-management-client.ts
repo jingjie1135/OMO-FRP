@@ -140,9 +140,14 @@ async function postVoid(options: ServerManagementClientOptions, path: string, bo
 }
 
 function createHeaders(options: ServerManagementClientOptions, headers: Record<string, string> = {}): HeadersInit {
-  if (!options.sessionToken) {
-    return headers
+  const nextHeaders: Record<string, string> = {
+    ...headers,
+    "x-management-ui-request": "1",
   }
 
-  return { ...headers, authorization: `Bearer ${options.sessionToken}` }
+  if (!options.sessionToken) {
+    return nextHeaders
+  }
+
+  return { ...nextHeaders, authorization: `Bearer ${options.sessionToken}` }
 }

@@ -21,6 +21,10 @@ export function createServerApi(options: ServerApiOptions = {}): ServerApi {
       }
 
       const method = (init.method ?? "GET").toUpperCase()
+      if (!isManagementUiRequest(method, init.headers)) {
+        return jsonResponse({ error: "Forbidden" }, 403)
+      }
+
       const body = init.body ? await parseJsonBody(init.body) : undefined
 
       if (path === "/api/runtime" && method === "GET") {
@@ -174,6 +178,15 @@ export function createServerApi(options: ServerApiOptions = {}): ServerApi {
 
     },
   }
+}
+
+function isManagementUiRequest(method: string, headers: HeadersInit | undefined): boolean {
+  if (method === "GET" || method === "HEAD" || method === "OPTIONS") {
+    return true
+  }
+
+  const normalizedHeaders = new Headers(headers)
+  return normalizedHeaders.get("x-management-ui-request") === "1"
 }
 
 function isAuthorized(headers: HeadersInit | undefined, sessionToken: string | undefined): boolean {

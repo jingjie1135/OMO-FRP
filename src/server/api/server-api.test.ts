@@ -134,6 +134,41 @@ describe("server api", () => {
 
     expect(response.status).toBe(401)
   })
+
+  it("rejects mutating requests without a management UI request header", async () => {
+    const api = createServerApi({ sessionToken: "session-secret" })
+
+    const response = await api.request(
+      "/api/frp/start",
+      {
+        method: "POST",
+        headers: { authorization: "Bearer session-secret", "content-type": "application/json" },
+      },
+    )
+
+    expect(response.status).toBe(403)
+  })
+
+  it("allows mutating requests from the management UI request header", async () => {
+    const api = createServerApi({ sessionToken: "session-secret" })
+
+    const response = await api.request(
+      "/api/tools/install",
+      {
+        method: "POST",
+        headers: {
+          authorization: "Bearer session-secret",
+          "content-type": "application/json",
+          "x-management-ui-request": "1",
+        },
+        body: JSON.stringify({ kind: "opencode" }),
+      },
+    )
+    const body = await response.json()
+
+    expect(response.status).toBe(200)
+    expect(body.status).toBe("succeeded")
+  })
 })
 
 function authenticated(): RequestInit {
@@ -143,7 +178,11 @@ function authenticated(): RequestInit {
 function postJson(body: unknown): RequestInit {
   return {
     method: "POST",
-    headers: { authorization: "Bearer session-secret", "content-type": "application/json" },
+    headers: {
+      authorization: "Bearer session-secret",
+      "content-type": "application/json",
+      "x-management-ui-request": "1",
+    },
     body: body === undefined ? undefined : JSON.stringify(body),
   }
 }
