@@ -217,7 +217,11 @@ describe("management UI pages", () => {
     expect(toolsContainer.textContent).toContain("OpenCode")
     expect(toolsContainer.querySelector('h2#detections-heading')).toBeTruthy()
     expect(toolsContainer.querySelector('h2#instances-heading')).toBeTruthy()
-    expect(toolsContainer.querySelector('h1')?.textContent).toContain("Tools Management")
+    expect(toolsContainer.querySelector('h1')?.textContent).toContain("工具管理")
+    expect(toolsContainer.textContent).toContain("运行环境检测")
+    expect(toolsContainer.textContent).toContain("安装新工具")
+    expect(toolsContainer.textContent).toContain("查看日志")
+    expect(toolsContainer.querySelector('[data-testid="tool-card-opencode-server"]')).toBeTruthy()
 
     const configContainer = render(
       <ConfigPage
@@ -237,10 +241,14 @@ describe("management UI pages", () => {
     )
     expect(configContainer.textContent).toContain("fast")
     expect(configContainer.textContent).toContain("/tmp/fast.json")
+    expect(configContainer.querySelector('h1')?.textContent).toContain("配置与备份")
     expect(configContainer.querySelector('h2#target-selection-heading')).toBeTruthy()
     expect(configContainer.querySelector('h2#editor-heading')).toBeTruthy()
     expect(configContainer.querySelector('h2#presets-heading')).toBeTruthy()
     expect(configContainer.querySelector('h2#backups-heading')).toBeTruthy()
+    expect(configContainer.textContent).toContain("应用预设")
+    expect(configContainer.textContent).toContain("最后更新于")
+    expect(configContainer.querySelector("textarea")?.className).toContain("bg-slate-900")
 
     const endpointsContainer = render(
       <EndpointsPage
@@ -252,7 +260,8 @@ describe("management UI pages", () => {
       />,
     )
     expect(endpointsContainer.textContent).toContain("Desktop Route")
-    expect(endpointsContainer.textContent).toContain("disabled")
+    expect(endpointsContainer.textContent).toContain("未启用")
+    expect(endpointsContainer.querySelector('h1')?.textContent).toContain("公网入口")
     expect(endpointsContainer.querySelector('h2#endpoint-list-heading')).toBeTruthy()
     expect(endpointsContainer.querySelector('h2#endpoint-editor-heading')).toBeTruthy()
     expect(endpointsContainer.querySelector('h2#endpoint-validation-heading')).toBeTruthy()
@@ -261,14 +270,25 @@ describe("management UI pages", () => {
     expect(endpointsContainer.querySelector('h2#diagnostics-heading')).toBeTruthy()
 
     const settingsContainer = render(<SettingsPage info={serverInfo} />)
-    expect(settingsContainer.textContent).toContain("settings:mode=server")
-    expect(settingsContainer.textContent).toContain("same-origin management API")
+    expect(settingsContainer.querySelector('h1')?.textContent).toContain("系统设置")
+    expect(settingsContainer.textContent).not.toContain("settings:mode=server")
+    expect(settingsContainer.textContent).toContain("同源管理接口")
     expect(settingsContainer.textContent).not.toContain("Cleanup Old Backups")
-    expect(settingsContainer.querySelector<HTMLAnchorElement>('a[href="/config"]')?.textContent).toContain("Restore Config Flow")
+    expect(settingsContainer.querySelector<HTMLAnchorElement>('a[href="/config"]')?.textContent).toContain("前往配置恢复流程")
     expect(settingsContainer.querySelector('h2#runtime-heading')).toBeTruthy()
     expect(settingsContainer.querySelector('h2#security-heading')).toBeTruthy()
     expect(settingsContainer.querySelector('h2#backups-heading')).toBeTruthy()
     expect(settingsContainer.querySelector('h2#diagnostics-heading')).toBeTruthy()
+    expect(settingsContainer.textContent).toContain("系统能力")
+    expect(settingsContainer.textContent).toContain("FRP 服务端")
+    expect(settingsContainer.textContent).toContain("Systemd 服务")
+    expect(settingsContainer.textContent).toContain("OpenCode 访问密码")
+    expect(settingsContainer.textContent).toContain("通过")
+    expect(settingsContainer.textContent).toContain("备份时间线")
+    expect(settingsContainer.textContent).toContain("手动备份待接入")
+    expect(settingsContainer.textContent).toContain("旧备份清理待接入")
+    expect(settingsContainer.textContent).not.toContain("canManageFrpServer")
+    expect(settingsContainer.textContent).not.toContain("OpenCode password")
   })
 
   it("renders loading and error states with accessible roles", async () => {
@@ -279,7 +299,7 @@ describe("management UI pages", () => {
         backups={[]}
       />
     )
-    expect(configContainer.textContent).toContain("All changes saved")
+    expect(configContainer.textContent).toContain("当前修改已保存")
 
     const toolsContainer = render(<ToolsPage client={createToolsPageClient([], [])} />)
     await act(async () => {})
@@ -294,7 +314,7 @@ describe("management UI pages", () => {
         checkSafety={() => ({ ok: true, issues: [], suggestion: "Endpoint is ready to enable." })}
       />,
     )
-    expect(endpointsContainer.textContent).toContain("Loading endpoints...")
+    expect(endpointsContainer.textContent).toContain("正在加载公网入口...")
   })
 
   it("branches FRP page by runtime capability with visible reasons", () => {
@@ -306,10 +326,10 @@ describe("management UI pages", () => {
       />,
     )
 
-    expect(container.textContent).toContain("frp:server")
-    expect(container.textContent).toContain("server-frp:running")
-    expect(container.textContent).toContain("FRP Server Panel")
-    expect(container.textContent).toContain("Desktop frpc operations are not supported in server mode")
+    expect(container.textContent).toContain("FRP 穿透")
+    expect(container.textContent).not.toContain("frp:server")
+    expect(container.textContent).toContain("FRP 服务端")
+    expect(container.textContent).toContain("当前处于服务器模式，暂不支持桌面端 frpc 操作")
 
     document.body.innerHTML = ""
     const desktopContainer = render(
@@ -328,10 +348,9 @@ describe("management UI pages", () => {
       />,
     )
 
-    expect(desktopContainer.textContent).toContain("frp:client")
-    expect(desktopContainer.textContent).toContain("client-frp:stopped")
-    expect(desktopContainer.textContent).toContain("FRP Client Panel")
-    expect(desktopContainer.textContent).toContain("FRP server and system service management are restricted in desktop mode")
+    expect(desktopContainer.textContent).not.toContain("frp:client")
+    expect(desktopContainer.textContent).toContain("FRP 客户端")
+    expect(desktopContainer.textContent).toContain("桌面模式下不支持管理 FRP 服务端或系统服务")
     expect(desktopContainer.textContent).toContain("endpoint-route:not configured:7000:4096")
 
     document.body.innerHTML = ""
@@ -351,6 +370,6 @@ describe("management UI pages", () => {
       />,
     )
     expect(unavailableContainer.querySelector('[role="alert"]')).toBeTruthy()
-    expect(unavailableContainer.textContent).toContain("Reason: Both canManageFrpServer and canManageFrpClient are false")
+    expect(unavailableContainer.textContent).toContain("原因：当前运行时既不能管理 FRP 服务端，也不能管理 FRP 客户端")
   })
 })
