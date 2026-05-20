@@ -86,10 +86,13 @@ function renderPage(options: {
   return { container, enabledIds, disabledIds }
 }
 
-function clickButton(container: HTMLElement, label: string): void {
-  const button = Array.from(container.querySelectorAll("button")).find((item) => item.textContent === label)
+async function clickButton(container: HTMLElement, label: string): Promise<void> {
+  const button = Array.from(container.querySelectorAll("button")).find((item) => item.textContent?.includes(label))
   if (!(button instanceof HTMLButtonElement)) throw new Error(`Button not found: ${label}`)
-  act(() => button.click())
+  await act(async () => {
+    button.click()
+    await Promise.resolve()
+  })
 }
 
 describe("EndpointsPage", () => {
@@ -108,26 +111,34 @@ describe("EndpointsPage", () => {
     expect(container.textContent).toContain("opencode-password")
   })
 
-  it("blocks enable button when safety checks fail", () => {
+  it("opens the fomo-style security check modal and blocks confirmation when safety checks fail", async () => {
     const disabledEndpoint: PublicEndpoint = { ...endpoint, status: "disabled" }
     const { container, enabledIds } = renderPage({
       endpoints: [disabledEndpoint],
       checkSafety: () => ({ ok: false, issues: ["Target tool is not running."], suggestion: "Target tool is not running." }),
     })
 
-    clickButton(container, "Enable")
+    await clickButton(container, "启用")
 
     expect(enabledIds).toEqual([])
+    expect(container.textContent).toContain("启用入口安全检查")
+    expect(container.textContent).toContain("正在检查 OpenCode Endpoint 的安全配置")
+    expect(container.textContent).toContain("OpenCode 运行中")
+    expect(container.textContent).toContain("密码已设置")
+    expect(container.textContent).toContain("端口可达")
     expect(container.textContent).toContain("Target tool is not running.")
+    const confirmButton = Array.from(container.querySelectorAll("button")).find((button) => button.textContent?.includes("确认启用"))
+    expect(confirmButton).toBeInstanceOf(HTMLButtonElement)
+    expect((confirmButton as HTMLButtonElement).disabled).toBe(true)
   })
 
-  it("confirms disable and preserves endpoint configuration in the view", () => {
+  it("confirms disable and preserves endpoint configuration in the view", async () => {
     const originalConfirm = window.confirm
     window.confirm = () => true
     try {
       const { container, disabledIds } = renderPage()
 
-      clickButton(container, "Disable")
+      await clickButton(container, "停用")
 
       expect(disabledIds).toEqual([endpoint.id])
       expect(container.textContent).toContain("code.example.com")
@@ -137,25 +148,14 @@ describe("EndpointsPage", () => {
     }
   })
 
-  it("requires confirmation before enabling a public endpoint", () => {
+  it("confirms enable from the fomo-style security check modal", async () => {
     const disabledEndpoint: PublicEndpoint = { ...endpoint, status: "disabled" }
-    const originalConfirm = window.confirm
-    const confirmationMessages: string[] = []
-    window.confirm = (message?: string) => {
-      confirmationMessages.push(String(message))
-      return false
-    }
-    try {
-      const { container, enabledIds } = renderPage({ endpoints: [disabledEndpoint] })
+    const { container, enabledIds } = renderPage({ endpoints: [disabledEndpoint] })
 
-      clickButton(container, "Enable")
+    await clickButton(container, "启用")
+    expect(container.textContent).toContain("启用入口安全检查")
+    await clickButton(container, "确认启用")
 
-      expect(enabledIds).toEqual([])
-      expect(confirmationMessages[0]).toContain("Enable public endpoint")
-      expect(confirmationMessages[0]).toContain("opencode-password")
-      expect(confirmationMessages[0]).toContain("https://code.example.com")
-    } finally {
-      window.confirm = originalConfirm
-    }
+    expect(enabledIds).toEqual([disabledEndpoint.id])
   })
 })
