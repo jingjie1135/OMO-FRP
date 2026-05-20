@@ -88,27 +88,26 @@ fn save_config(_target: serde_json::Value, _content: String) {}
 
 #[tauri::command(rename_all = "snake_case")]
 fn validate_config(_target: serde_json::Value, content: String) -> serde_json::Value {
-    let mut valid = true;
-    let mut field_errors = Vec::new();
-
-    if content.trim().is_empty() {
-        valid = false;
-        field_errors.push(serde_json::json!({
-            "field": "content",
-            "message": "Content cannot be empty"
-        }));
-    } else if let Err(error) = serde_json::from_str::<serde_json::Value>(&content) {
-        valid = false;
-        field_errors.push(serde_json::json!({
-            "field": "content",
-            "message": error.to_string()
-        }));
-    }
+    let validation_result = validate_json_config(&content);
+    let valid = validation_result.is_ok();
+    let field_errors = validation_result.err().map_or_else(Vec::new, |message| vec![serde_json::json!({
+        "field": "content",
+        "message": message
+    })]);
 
     serde_json::json!({
         "valid": valid,
         "fieldErrors": field_errors,
     })
+}
+
+fn validate_json_config(content: &str) -> Result<(), String> {
+    if content.trim().is_empty() {
+        return Err("Content cannot be empty".to_string());
+    }
+    serde_json::from_str::<serde_json::Value>(content)
+        .map(|_| ())
+        .map_err(|error| error.to_string())
 }
 
 #[tauri::command(rename_all = "snake_case")]
@@ -417,4 +416,19 @@ pub fn run() {
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
+}
+
+#[cfg(test)]
+mod tests {
+    use super::validate_json_config;
+
+    #[test]
+    fn accepts_valid_json_config() {
+        assert!(validate_json_config("{\"theme\":\"dark\"}").is_ok());
+    }
+
+    #[test]
+    fn rejects_empty_json_config() {
+        assert_eq!(validate_json_config(""), Err("Content cannot be empty".to_string()));
+    }
 }
