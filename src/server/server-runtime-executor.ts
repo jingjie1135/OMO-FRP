@@ -1,12 +1,23 @@
 import type { RuntimeExecutor } from "../management-api/runtime-executor"
+import type { FrpStatus } from "../management-api/types"
 import type { ToolDetection } from "../management-api/types"
+import { createFrpPanelClient } from "./frp-panel-client"
+import type { FrpPanelHealth } from "./frp-panel-client"
+
+interface FrpPanelHealthClient {
+  health(): Promise<FrpPanelHealth>
+}
 
 export interface ServerRuntimeExecutorOptions {
   opencodeUrl?: string
+  frpPanelUrl?: string
+  frpPanelClient?: FrpPanelHealthClient
 }
 
 export function createServerRuntimeExecutor(options: ServerRuntimeExecutorOptions = {}): RuntimeExecutor {
   const opencodeUrl = options.opencodeUrl ?? process.env.OPENCODE_INTERNAL_URL ?? "http://opencode:4096"
+  const frpPanelUrl = options.frpPanelUrl ?? process.env.FRP_PANEL_INTERNAL_API_URL ?? `http://frp-panel:${process.env.FRP_PANEL_API_PORT ?? "9000"}`
+  const frpPanelClient = options.frpPanelClient ?? createFrpPanelClient({ baseUrl: frpPanelUrl })
 
   return {
     async detectTools(): Promise<ToolDetection[]> {
@@ -31,7 +42,7 @@ export function createServerRuntimeExecutor(options: ServerRuntimeExecutorOption
       return { jobId: `restart:${instanceId}`, status: "failed", message: "OpenCode container restart is not enabled for this runtime yet." }
     },
     async getToolLogs() { return [] },
-    async getFrpStatus() { return { mode: "server", running: false, message: "FRP status integration is not connected yet." } },
+    async getFrpStatus() { return getServerFrpStatus(await frpPanelClient.health()) },
     async saveFrpConfig() {},
     async startFrp() { return { jobId: "start-frp:server", status: "failed", message: "FRP server execution is not connected yet." } },
     async stopFrp() { return { jobId: "stop-frp:server", status: "failed", message: "FRP server execution is not connected yet." } },
@@ -43,6 +54,37 @@ export function createServerRuntimeExecutor(options: ServerRuntimeExecutorOption
     async retryCloudflareTunnelStep(stepId) {
       return { jobId: `retry-cloudflare:${stepId}`, status: "failed", message: "Cloudflare retry is not connected yet." }
     },
+  }
+}
+
+function getServerFrpStatus(health: FrpPanelHealth): FrpStatus {
+  if (health.reachable && health.status !== undefined && health.status < 500) {
+    return {
+      mode: "server",
+      running: true,
+      status: "ready",
+      message: `frp-panel is reachable at HTTP ${health.status}.`,
+    }
+  }
+
+  if (health.reachable) {
+    return {
+      mode: "server",
+      running: false,
+      status: "error",
+      failureReason: "api_unreachable",
+      message: `frp-panel API returned HTTP ${health.status}.`,
+      suggestion: "Verify the frp-panel API URL and that the API endpoint is reachable from the management-ui container.",
+    }
+  }
+
+  return {
+    mode: "server",
+    running: false,
+    status: "error",
+    failureReason: "api_unreachable",
+    message: `frp-panel API is unreachable${health.message ? `: ${health.message}` : "."}`,
+    suggestion: "Verify the frp-panel API URL and that the API endpoint is reachable from the management-ui container.",
   }
 }
 
