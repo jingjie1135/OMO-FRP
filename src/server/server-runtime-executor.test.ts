@@ -194,6 +194,67 @@ test("returns real OpenCode container logs when control is enabled", async () =>
   expect(logs).toEqual([{ timestamp: "2026-05-21T00:00:00.000Z", level: "info", message: "OpenCode listening" }])
 })
 
+test("keeps FRP container control disabled unless explicitly enabled", async () => {
+  const calls: string[] = []
+  const executor = createServerRuntimeExecutor({
+    frpContainerController: {
+      async start() {
+        calls.push("start")
+        return { ok: true, message: "started" }
+      },
+      async stop() {
+        calls.push("stop")
+        return { ok: true, message: "stopped" }
+      },
+      async restart() {
+        throw new Error("not used")
+      },
+      async logs() {
+        throw new Error("not used")
+      },
+    },
+  })
+
+  const result = await executor.startFrp()
+
+  expect(result).toEqual({
+    jobId: "start-frp:server",
+    status: "failed",
+    message: "FRP container control is disabled. Set OPENCODE_CONTAINER_CONTROL_ENABLED=true and mount the Docker socket to enable it.",
+  })
+  expect(calls).toEqual([])
+})
+
+test("starts and stops the FRP container when Docker control is enabled", async () => {
+  const calls: string[] = []
+  const executor = createServerRuntimeExecutor({
+    opencodeContainerControlEnabled: true,
+    frpContainerController: {
+      async start() {
+        calls.push("start")
+        return { ok: true, message: "FRP container started." }
+      },
+      async stop() {
+        calls.push("stop")
+        return { ok: true, message: "FRP container stopped." }
+      },
+      async restart() {
+        throw new Error("not used")
+      },
+      async logs() {
+        throw new Error("not used")
+      },
+    },
+  })
+
+  const start = await executor.startFrp()
+  const stop = await executor.stopFrp()
+
+  expect(start).toEqual({ jobId: "start-frp:server", status: "succeeded", message: "FRP container started." })
+  expect(stop).toEqual({ jobId: "stop-frp:server", status: "succeeded", message: "FRP container stopped." })
+  expect(calls).toEqual(["start", "stop"])
+})
+
 test("fails OpenCode container control when Docker reports an error", async () => {
   const executor = createServerRuntimeExecutor({
     opencodeContainerControlEnabled: true,

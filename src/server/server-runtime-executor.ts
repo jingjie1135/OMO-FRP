@@ -17,6 +17,7 @@ export interface ServerRuntimeExecutorOptions {
   frpPanelClient?: FrpPanelHealthClient
   opencodeContainerControlEnabled?: boolean
   opencodeContainerController?: DockerContainerController
+  frpContainerController?: DockerContainerController
 }
 
 export function createServerRuntimeExecutor(options: ServerRuntimeExecutorOptions = {}): RuntimeExecutor {
@@ -25,6 +26,12 @@ export function createServerRuntimeExecutor(options: ServerRuntimeExecutorOption
   const frpPanelClient = options.frpPanelClient ?? createFrpPanelClient({ baseUrl: frpPanelUrl })
   const opencodeContainerControlEnabled = options.opencodeContainerControlEnabled ?? process.env.OPENCODE_CONTAINER_CONTROL_ENABLED === "true"
   const opencodeContainerController = options.opencodeContainerController ?? createDockerContainerController()
+  const frpContainerController = options.frpContainerController ?? createDockerContainerController({
+    composeProject: process.env.FRP_PANEL_COMPOSE_PROJECT ?? process.env.OPENCODE_COMPOSE_PROJECT,
+    composeService: process.env.FRP_PANEL_COMPOSE_SERVICE ?? "frp-panel",
+    containerName: process.env.FRP_PANEL_CONTAINER_NAME ?? "frp-panel",
+    displayName: "FRP",
+  })
 
   return {
     async detectTools(): Promise<ToolDetection[]> {
@@ -56,8 +63,8 @@ export function createServerRuntimeExecutor(options: ServerRuntimeExecutorOption
     },
     async getFrpStatus() { return getServerFrpStatus(await frpPanelClient.health()) },
     async saveFrpConfig() {},
-    async startFrp() { return { jobId: "start-frp:server", status: "failed", message: "FRP server execution is not connected yet." } },
-    async stopFrp() { return { jobId: "stop-frp:server", status: "failed", message: "FRP server execution is not connected yet." } },
+    async startFrp() { return controlFrpContainer("start", opencodeContainerControlEnabled, () => frpContainerController.start()) },
+    async stopFrp() { return controlFrpContainer("stop", opencodeContainerControlEnabled, () => frpContainerController.stop()) },
     async getCloudflareTunnelStatus() { return { mode: "unavailable", running: false, message: "Cloudflare runtime is not connected yet." } },
     async saveCloudflareTunnelConfig() {},
     async createCloudflareTunnelPlan() { throw new Error("Cloudflare plan integration is not connected yet") },
@@ -67,6 +74,29 @@ export function createServerRuntimeExecutor(options: ServerRuntimeExecutorOption
       return { jobId: `retry-cloudflare:${stepId}`, status: "failed", message: "Cloudflare retry is not connected yet." }
     },
   }
+}
+
+async function controlFrpContainer(
+  action: "start" | "stop",
+  enabled: boolean,
+  operation: () => Promise<DockerContainerActionResult>,
+) {
+  const jobId = `${action}-frp:server`
+  if (!enabled) {
+    return {
+      jobId,
+      status: "failed" as const,
+      message: "FRP container control is disabled. Set OPENCODE_CONTAINER_CONTROL_ENABLED=true and mount the Docker socket to enable it.",
+    }
+  }
+
+  let result: DockerContainerActionResult
+  try {
+    result = await operation()
+  } catch (error) {
+    return { jobId, status: "failed" as const, message: `Docker container control failed: ${error instanceof Error ? error.message : String(error)}` }
+  }
+  return { jobId, status: result.ok ? "succeeded" as const : "failed" as const, message: result.message }
 }
 
 async function getOpenCodeContainerLogs(enabled: boolean, controller: DockerContainerController): Promise<LogLine[]> {
