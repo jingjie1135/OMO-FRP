@@ -1,5 +1,6 @@
 import { expect, test } from "bun:test"
 import { createServer } from "node:http"
+import type { CloudflaredProcessController } from "./cloudflared-process"
 import { createServerRuntimeExecutor } from "./server-runtime-executor"
 
 test("detects OpenCode as running when health endpoint responds", async () => {
@@ -98,6 +99,27 @@ test("uses the FRP panel internal API environment URL", async () => {
   } finally {
     if (previousUrl === undefined) delete process.env.FRP_PANEL_INTERNAL_API_URL
     else process.env.FRP_PANEL_INTERNAL_API_URL = previousUrl
+    server.close()
+  }
+})
+
+test("reports cloudflared when detection succeeds", async () => {
+  const server = createServer((_request, response) => {
+    response.writeHead(200, { "access-control-allow-origin": "*", "content-type": "text/plain" })
+    response.end("ok")
+  })
+  await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve))
+  const address = server.address()
+  if (!address || typeof address === "string") {
+    throw new Error("HTTP test server did not expose a TCP port")
+  }
+  try {
+    const executor = createServerRuntimeExecutor({ opencodeUrl: `http://127.0.0.1:${address.port}`, cloudflaredDetected: true })
+
+    const detections = await executor.detectTools()
+
+    expect(detections.some((tool) => tool.kind === "cloudflared" && tool.detected && tool.binaryPath === "cloudflared")).toBe(true)
+  } finally {
     server.close()
   }
 })
@@ -253,6 +275,62 @@ test("starts and stops the FRP container when Docker control is enabled", async 
   expect(start).toEqual({ jobId: "start-frp:server", status: "succeeded", message: "FRP container started." })
   expect(stop).toEqual({ jobId: "stop-frp:server", status: "succeeded", message: "FRP container stopped." })
   expect(calls).toEqual(["start", "stop"])
+})
+
+test("creates a Cloudflare quick tunnel plan with cloudflared detection", async () => {
+  const executor = createServerRuntimeExecutor({ cloudflaredDetected: true })
+
+  const plan = await executor.createCloudflareTunnelPlan({ mode: "quick", localHost: "127.0.0.1", localPort: 4096 })
+
+  expect(plan).toMatchObject({
+    mode: "quick",
+    localUrl: "http://127.0.0.1:4096",
+    publicUrl: "https://<generated>.trycloudflare.com",
+    cloudflaredDetected: true,
+    diagnostics: [],
+    steps: [],
+  })
+  expect(plan.commandSummary).toEqual(["cloudflared tunnel --url http://127.0.0.1:4096"])
+})
+
+test("starts, reports, logs, and stops a managed Cloudflare quick tunnel", async () => {
+  const calls: string[] = []
+  let running = false
+  let publicUrl: string | undefined
+  const controller: CloudflaredProcessController = {
+    async startQuickTunnel(localUrl) {
+      calls.push(`start:${localUrl}`)
+      running = true
+      publicUrl = "https://alpha-beta.trycloudflare.com"
+      return { ok: true, publicUrl, message: `Cloudflare quick tunnel is running at ${publicUrl}.` }
+    },
+    async stop() {
+      calls.push("stop")
+      running = false
+      publicUrl = undefined
+      return { ok: true, message: "Cloudflare quick tunnel stopped." }
+    },
+    status() {
+      return { running, publicUrl }
+    },
+    logs() {
+      return [{ timestamp: "2026-05-21T00:00:00.000Z", level: "info", message: "https://alpha-beta.trycloudflare.com" }]
+    },
+  }
+  const executor = createServerRuntimeExecutor({ cloudflaredDetected: true, cloudflaredProcessController: controller })
+  const config = { mode: "quick" as const, localHost: "127.0.0.1", localPort: 4096 }
+
+  await executor.saveCloudflareTunnelConfig(config)
+  const start = await executor.startCloudflareTunnel(config)
+  const status = await executor.getCloudflareTunnelStatus()
+  const logs = await executor.getToolLogs("cloudflared-server")
+  const stop = await executor.stopCloudflareTunnel()
+
+  expect(start).toEqual({ jobId: "start-cloudflare:server", status: "succeeded", message: "Cloudflare quick tunnel is running at https://alpha-beta.trycloudflare.com." })
+  expect(status).toEqual({ mode: "quick", running: true, publicUrl: "https://alpha-beta.trycloudflare.com", currentStep: "verify_public_access", message: "Cloudflare quick tunnel is running at https://alpha-beta.trycloudflare.com." })
+  expect(logs).toEqual([{ timestamp: "2026-05-21T00:00:00.000Z", level: "info", message: "https://alpha-beta.trycloudflare.com" }])
+  expect(stop).toEqual({ jobId: "stop-cloudflare:server", status: "succeeded", message: "Cloudflare quick tunnel stopped." })
+  expect(calls).toEqual(["start:http://127.0.0.1:4096", "stop"])
 })
 
 test("fails OpenCode container control when Docker reports an error", async () => {

@@ -1,5 +1,6 @@
 import { readdir } from "node:fs/promises"
 import { join, relative, resolve } from "node:path"
+import type { PublicEndpoint } from "../core/app-config/types"
 import { SERVER_CAPABILITIES, type AppConfig, type RuntimeInfo } from "../core/app-config/types"
 import { NodeStorage } from "../core/storage/node-storage"
 import type { StorageAdapter } from "../core/storage/storage-adapter"
@@ -167,7 +168,7 @@ function createDurableServerRuntimeAdapter(adapter: ServerRuntimeAdapter, paths:
     async restoreBackup(target, backupId) { await withPersistedConfig(() => adapter.restoreBackup(constrainConfigTarget(paths, target), backupId)) },
     async listEndpoints() { return adapter.listEndpoints() },
     async saveEndpoint(endpoint) { await withPersistedConfig(() => adapter.saveEndpoint(endpoint)) },
-    async enableEndpoint(id) { return recordJob("enable-endpoint", id, await withPersistedConfig(() => adapter.enableEndpoint(id))) },
+    async enableEndpoint(id) { return recordJob("enable-endpoint", id, await failUntilServerEndpointProvisioningExists(adapter, id)) },
     async disableEndpoint(id) { return recordJob("disable-endpoint", id, await withPersistedConfig(() => adapter.disableEndpoint(id))) },
     async getFrpStatus() { return adapter.getFrpStatus() },
     async saveFrpConfig(config) { await withPersistedConfig(() => adapter.saveFrpConfig(config)) },
@@ -191,6 +192,18 @@ function createDurableServerRuntimeAdapter(adapter: ServerRuntimeAdapter, paths:
         redactedLogs: [...diagnostics.redactedLogs, ...await readAllRuntimeLogs(paths.logDirectory)],
       }
     },
+  }
+}
+
+async function failUntilServerEndpointProvisioningExists(adapter: ServerRuntimeAdapter, id: string): Promise<JobResult> {
+  const endpoint = (await adapter.listEndpoints()).find((item: PublicEndpoint) => item.id === id)
+  if (!endpoint) {
+    return { jobId: `enable-endpoint:${id}`, status: "failed", message: `Unknown endpoint: ${id}` }
+  }
+  return {
+    jobId: `enable-endpoint:${id}`,
+    status: "failed",
+    message: `Server endpoint route provisioning is not connected yet. Configure Caddy/frp-panel route for ${endpoint.domain}, then retry.`,
   }
 }
 

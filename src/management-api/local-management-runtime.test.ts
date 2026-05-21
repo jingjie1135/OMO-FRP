@@ -168,7 +168,7 @@ describe("local management runtime executor", () => {
     expect((await runtime.startFrp()).message).toBe("frp start delegated")
     expect((await runtime.stopFrp()).message).toBe("frp stop delegated")
     expect((await runtime.getCloudflareTunnelStatus()).message).toBe("cloudflare delegated")
-    expect((await runtime.startCloudflareTunnel({ mode: "quick", localHost: "127.0.0.1", localPort: 4096 })).message).toBe("cloudflare start delegated")
+    expect((await runtime.startCloudflareTunnel({ mode: "quick", localHost: "127.0.0.1", localPort: 4096 })).message).toBe("OpenCode must be running before cloudflared starts.")
     expect((await runtime.stopCloudflareTunnel()).message).toBe("cloudflare stop delegated")
     expect((await runtime.retryCloudflareTunnelStep("start_tunnel")).message).toBe("retry delegated")
 
@@ -182,7 +182,6 @@ describe("local management runtime executor", () => {
       "startFrp",
       "stopFrp",
       "getCloudflareTunnelStatus",
-      "startCloudflareTunnel",
       "stopCloudflareTunnel",
       "retryCloudflareTunnelStep:start_tunnel",
     ])
@@ -290,5 +289,65 @@ describe("local management runtime cloudflare tunnel", () => {
 
     expect(result.status).toBe("failed")
     expect(result.message).toContain("OpenCode password protection must be configured")
+  })
+
+  it("runs cloudflare safety checks before delegating tunnel start to an executor", async () => {
+    const calls: string[] = []
+    const executor: RuntimeExecutor = {
+      async detectTools() { throw new Error("not used") },
+      async installTool() { throw new Error("not used") },
+      async startTool() { throw new Error("not used") },
+      async stopTool() { throw new Error("not used") },
+      async restartTool() { throw new Error("not used") },
+      async getToolLogs() { return [] },
+      async getFrpStatus() { throw new Error("not used") },
+      async saveFrpConfig() {},
+      async startFrp() { throw new Error("not used") },
+      async stopFrp() { throw new Error("not used") },
+      async getCloudflareTunnelStatus() { throw new Error("not used") },
+      async saveCloudflareTunnelConfig() {},
+      async createCloudflareTunnelPlan() { throw new Error("not used") },
+      async startCloudflareTunnel() {
+        calls.push("startCloudflareTunnel")
+        return { jobId: "start-cloudflare:server", status: "succeeded", message: "delegated" }
+      },
+      async stopCloudflareTunnel() { throw new Error("not used") },
+      async retryCloudflareTunnelStep() { throw new Error("not used") },
+    }
+    const runtime = createLocalManagementRuntime({
+      capabilities: SERVER_CAPABILITIES,
+      defaultConfigDirectory: "/tmp/config",
+      frpStatusMode: "server",
+      executor,
+      config: createConfig({
+        toolInstances: [
+          runningOpenCode,
+          {
+            id: "cloudflared-server",
+            kind: "cloudflared",
+            displayName: "cloudflared",
+            hostType: "server",
+            installState: "installed",
+            binaryPath: "cloudflared",
+            defaultPort: 0,
+            status: "stopped",
+          },
+        ],
+        publicEndpoints: [
+          {
+            ...endpoint,
+            id: "cloudflare-route",
+            targetType: "cloudflare",
+            authMode: "basic-auth",
+          },
+        ],
+      }),
+    })
+
+    const result = await runtime.startCloudflareTunnel({ mode: "quick", localHost: "127.0.0.1", localPort: 4096 })
+
+    expect(result.status).toBe("failed")
+    expect(result.message).toContain("OpenCode password protection must be configured")
+    expect(calls).toEqual([])
   })
 })

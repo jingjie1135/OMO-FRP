@@ -81,6 +81,51 @@ describe("persisted server runtime adapter", () => {
     }
   })
 
+  it("fails server endpoint enablement with an actionable route provisioning message", async () => {
+    const { restore } = await useTempStateRoot()
+    try {
+      const paths = createServerRuntimePaths()
+      await saveServerAppConfig(paths.appConfigPath, {
+        mode: "server",
+        toolInstances: [{
+          id: "opencode-server",
+          kind: "opencode",
+          displayName: "OpenCode",
+          hostType: "server",
+          installState: "configured",
+          defaultPort: 4096,
+          currentPort: 4096,
+          status: "running",
+        }],
+        pluginConfigs: [],
+        publicEndpoints: [{
+          id: "route-1",
+          name: "Route 1",
+          domain: "code.example.com",
+          protocol: "https",
+          targetType: "server-local",
+          targetToolInstanceId: "opencode-server",
+          authMode: "opencode-password",
+          status: "disabled",
+        }],
+        frpClients: [],
+      })
+      const adapter = await createPersistedServerRuntimeAdapter()
+
+      const result = await adapter.enableEndpoint("route-1")
+      const [endpoint] = await adapter.listEndpoints()
+
+      expect(result).toEqual({
+        jobId: "enable-endpoint:route-1",
+        status: "failed",
+        message: "Server endpoint route provisioning is not connected yet. Configure Caddy/frp-panel route for code.example.com, then retry.",
+      })
+      expect(endpoint?.status).toBe("disabled")
+    } finally {
+      restore()
+    }
+  })
+
   it("records jobs and logs for server executor actions", async () => {
     const { restore } = await useTempStateRoot()
     const server = createServer((_request, response) => {

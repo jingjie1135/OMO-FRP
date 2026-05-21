@@ -1,3 +1,12 @@
+use std::collections::HashMap;
+use std::fs;
+use std::io::{BufRead, BufReader, Read};
+use std::path::Path;
+use std::process::{Child, Command, Stdio};
+use std::sync::{Mutex, OnceLock};
+use std::thread;
+use std::time::{SystemTime, UNIX_EPOCH};
+
 #[tauri::command(rename_all = "snake_case")]
 fn get_runtime_info() -> serde_json::Value {
     serde_json::json!({
@@ -23,7 +32,7 @@ fn get_runtime_info() -> serde_json::Value {
 
 #[tauri::command(rename_all = "snake_case")]
 fn detect_tools() -> serde_json::Value {
-    serde_json::json!([])
+    detect_tool_binaries(&["opencode", "frpc", "cloudflared"])
 }
 
 #[tauri::command(rename_all = "snake_case")]
@@ -42,49 +51,50 @@ fn install_tool(_request: serde_json::Value) -> serde_json::Value {
 
 #[tauri::command(rename_all = "snake_case")]
 fn start_tool(instance_id: String) -> serde_json::Value {
+    if instance_id.starts_with("opencode") {
+        return start_managed_process(
+            &instance_id,
+            &std::env::var("OPENCODE_BINARY").unwrap_or_else(|_| "opencode".to_string()),
+            &["serve", "--hostname", "127.0.0.1", "--port", "4096"],
+        );
+    }
     serde_json::json!({
         "jobId": format!("start:{}", instance_id),
-        "status": "succeeded",
-        "message": format!("{} started.", instance_id)
+        "status": "failed",
+        "message": format!("Desktop runtime can only start local OpenCode tool instances, not {}.", instance_id)
     })
 }
 
 #[tauri::command(rename_all = "snake_case")]
 fn stop_tool(instance_id: String) -> serde_json::Value {
-    serde_json::json!({
-        "jobId": format!("stop:{}", instance_id),
-        "status": "succeeded",
-        "message": format!("{} stopped.", instance_id)
-    })
+    stop_managed_process(&instance_id)
 }
 
 #[tauri::command(rename_all = "snake_case")]
 fn restart_tool(instance_id: String) -> serde_json::Value {
-    serde_json::json!({
-        "jobId": format!("restart:{}", instance_id),
-        "status": "succeeded",
-        "message": format!("{} restarted.", instance_id)
-    })
+    let _ = stop_managed_process(&instance_id);
+    start_tool(instance_id)
 }
 
 #[tauri::command(rename_all = "snake_case")]
 fn get_tool_logs(_instance_id: String) -> serde_json::Value {
-    serde_json::json!([])
+    serde_json::Value::Array(get_managed_process_logs(&_instance_id))
 }
 
 #[tauri::command(rename_all = "snake_case")]
 fn read_config(target: serde_json::Value) -> serde_json::Value {
-    let path = target.get("path").cloned().unwrap_or(serde_json::Value::Null);
-    serde_json::json!({
+    read_config_from_path(&target).unwrap_or_else(|error| serde_json::json!({
         "target": target,
-        "content": "{}",
-        "path": path,
-        "updatedAt": "2026-05-16T00:00:00.000Z"
-    })
+        "content": "",
+        "missing": true,
+        "error": error,
+    }))
 }
 
 #[tauri::command(rename_all = "snake_case")]
-fn save_config(_target: serde_json::Value, _content: String) {}
+fn save_config(target: serde_json::Value, content: String) -> Result<(), String> {
+    save_config_to_path(&target, content)
+}
 
 #[tauri::command(rename_all = "snake_case")]
 fn validate_config(_target: serde_json::Value, content: String) -> serde_json::Value {
@@ -108,6 +118,187 @@ fn validate_json_config(content: &str) -> Result<(), String> {
     serde_json::from_str::<serde_json::Value>(content)
         .map(|_| ())
         .map_err(|error| error.to_string())
+}
+
+fn read_config_from_path(target: &serde_json::Value) -> Result<serde_json::Value, String> {
+    let path = require_target_path(target)?;
+    let content = fs::read_to_string(path).map_err(|error| error.to_string())?;
+    Ok(serde_json::json!({
+        "target": target,
+        "content": content,
+        "path": path,
+    }))
+}
+
+fn save_config_to_path(target: &serde_json::Value, content: String) -> Result<(), String> {
+    validate_json_config(&content)?;
+    let path = require_target_path(target)?;
+    if let Some(parent) = Path::new(path).parent() {
+        fs::create_dir_all(parent).map_err(|error| error.to_string())?;
+    }
+    fs::write(path, content).map_err(|error| error.to_string())
+}
+
+fn require_target_path(target: &serde_json::Value) -> Result<&str, String> {
+    target
+        .get("path")
+        .and_then(serde_json::Value::as_str)
+        .filter(|path| !path.trim().is_empty())
+        .ok_or_else(|| "Config target path is required".to_string())
+}
+
+fn detect_tool_binaries(kinds: &[&str]) -> serde_json::Value {
+    serde_json::Value::Array(kinds.iter().map(|kind| detect_tool_binary(kind)).collect())
+}
+
+fn detect_tool_binary(kind: &str) -> serde_json::Value {
+    match Command::new(kind).arg("--version").output() {
+        Ok(output) => serde_json::json!({
+            "kind": kind,
+            "displayName": display_tool_name(kind),
+            "detected": output.status.success(),
+            "binaryPath": kind,
+            "version": parse_version_output(&output.stdout, &output.stderr),
+        }),
+        Err(_) => serde_json::json!({
+            "kind": kind,
+            "displayName": display_tool_name(kind),
+            "detected": false,
+            "binaryPath": kind,
+        }),
+    }
+}
+
+fn display_tool_name(kind: &str) -> &str {
+    match kind {
+        "opencode" => "OpenCode",
+        "frpc" => "frpc",
+        "cloudflared" => "cloudflared",
+        other => other,
+    }
+}
+
+fn parse_version_output(stdout: &[u8], stderr: &[u8]) -> Option<String> {
+    let output = if stdout.is_empty() { stderr } else { stdout };
+    let version = String::from_utf8_lossy(output).trim().to_string();
+    if version.is_empty() { None } else { Some(version) }
+}
+
+struct ManagedProcess {
+    child: Child,
+    logs: Vec<serde_json::Value>,
+}
+
+static MANAGED_PROCESSES: OnceLock<Mutex<HashMap<String, ManagedProcess>>> = OnceLock::new();
+
+fn managed_processes() -> &'static Mutex<HashMap<String, ManagedProcess>> {
+    MANAGED_PROCESSES.get_or_init(|| Mutex::new(HashMap::new()))
+}
+
+fn start_managed_process(id: &str, command: &str, args: &[&str]) -> serde_json::Value {
+    let mut processes = managed_processes().lock().expect("managed process lock poisoned");
+    if processes.contains_key(id) {
+        return serde_json::json!({
+            "jobId": format!("start:{}", id),
+            "status": "succeeded",
+            "message": format!("{} is already running.", id),
+        });
+    }
+
+    let mut child = match Command::new(command)
+        .args(args)
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+    {
+        Ok(child) => child,
+        Err(error) => return serde_json::json!({
+            "jobId": format!("start:{}", id),
+            "status": "failed",
+            "message": format!("Failed to start {}: {}", id, error),
+        }),
+    };
+
+    let stdout = child.stdout.take();
+    let stderr = child.stderr.take();
+    processes.insert(id.to_string(), ManagedProcess { child, logs: Vec::new() });
+    drop(processes);
+    capture_process_output(id.to_string(), "info", stdout);
+    capture_process_output(id.to_string(), "error", stderr);
+
+    serde_json::json!({
+        "jobId": format!("start:{}", id),
+        "status": "succeeded",
+        "message": format!("{} started.", id),
+    })
+}
+
+fn stop_managed_process(id: &str) -> serde_json::Value {
+    let process = managed_processes().lock().expect("managed process lock poisoned").remove(id);
+    match process {
+        Some(mut process) => {
+            let _ = process.child.kill();
+            let _ = process.child.wait();
+            serde_json::json!({
+                "jobId": format!("stop:{}", id),
+                "status": "succeeded",
+                "message": format!("{} stopped.", id),
+            })
+        }
+        None => serde_json::json!({
+            "jobId": format!("stop:{}", id),
+            "status": "failed",
+            "message": format!("{} is not running.", id),
+        }),
+    }
+}
+
+fn get_managed_process_logs(id: &str) -> Vec<serde_json::Value> {
+    managed_processes()
+        .lock()
+        .expect("managed process lock poisoned")
+        .get(id)
+        .map(|process| process.logs.clone())
+        .unwrap_or_default()
+}
+
+fn capture_process_output<R>(id: String, level: &'static str, stream: Option<R>)
+where
+    R: Read + Send + 'static,
+{
+    if let Some(stream) = stream {
+        thread::spawn(move || {
+            let reader = BufReader::new(stream);
+            for line in reader.lines().map_while(Result::ok) {
+                append_managed_process_log(&id, level, &line);
+            }
+        });
+    }
+}
+
+fn append_managed_process_log(id: &str, level: &str, message: &str) {
+    if let Some(process) = managed_processes().lock().expect("managed process lock poisoned").get_mut(id) {
+        process.logs.push(serde_json::json!({
+            "timestamp": current_timestamp_string(),
+            "level": level,
+            "message": message,
+        }));
+    }
+}
+
+fn current_timestamp_string() -> String {
+    let millis = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|duration| duration.as_millis())
+        .unwrap_or_default();
+    format!("{}", millis)
+}
+
+fn extract_trycloudflare_url(output: &str) -> Option<String> {
+    output
+        .split_whitespace()
+        .find(|part| part.starts_with("https://") && part.contains(".trycloudflare.com"))
+        .map(|part| part.trim_matches(|character: char| !character.is_ascii_alphanumeric() && character != ':' && character != '/' && character != '.' && character != '-').to_string())
 }
 
 #[tauri::command(rename_all = "snake_case")]
@@ -166,29 +357,48 @@ fn save_frp_config(_config: serde_json::Value) {}
 
 #[tauri::command(rename_all = "snake_case")]
 fn start_frp() -> serde_json::Value {
+    let config_path = std::env::var("FRPC_CONFIG_PATH").unwrap_or_else(|_| "frpc.toml".to_string());
+    let result = start_managed_process(
+        "frpc-desktop",
+        &std::env::var("FRPC_BINARY").unwrap_or_else(|_| "frpc".to_string()),
+        &["-c", config_path.as_str()],
+    );
     serde_json::json!({
         "jobId": "start-frp:desktop",
-        "status": "succeeded",
-        "message": "frpc started."
+        "status": result["status"],
+        "message": result["message"],
     })
 }
 
 #[tauri::command(rename_all = "snake_case")]
 fn stop_frp() -> serde_json::Value {
+    let result = stop_managed_process("frpc-desktop");
     serde_json::json!({
         "jobId": "stop-frp:desktop",
-        "status": "succeeded",
-        "message": "frpc stopped."
+        "status": result["status"],
+        "message": result["message"],
     })
 }
 
 #[tauri::command(rename_all = "snake_case")]
 fn get_cloudflare_tunnel_status() -> serde_json::Value {
+    let logs = get_managed_process_logs("cloudflared-desktop");
+    let public_url = logs.iter()
+        .filter_map(|line| line.get("message").and_then(serde_json::Value::as_str))
+        .find_map(extract_trycloudflare_url);
+    if let Some(url) = public_url {
+        return serde_json::json!({
+            "mode": "quick",
+            "running": true,
+            "message": format!("Cloudflare Tunnel is running at {}.", url),
+            "publicUrl": url,
+            "currentStep": "verify_public_access"
+        });
+    }
     serde_json::json!({
         "mode": "quick",
         "running": false,
-        "message": "Cloudflare Tunnel is not running yet.",
-        "publicUrl": "https://<generated>.trycloudflare.com",
+        "message": "Cloudflare Tunnel is not running.",
         "currentStep": "start_tunnel"
     })
 }
@@ -263,20 +473,29 @@ fn create_cloudflare_tunnel_plan(config: serde_json::Value) -> serde_json::Value
 }
 
 #[tauri::command(rename_all = "snake_case")]
-fn start_cloudflare_tunnel(_config: serde_json::Value) -> serde_json::Value {
+fn start_cloudflare_tunnel(config: serde_json::Value) -> serde_json::Value {
+    let local_host = config.get("localHost").and_then(serde_json::Value::as_str).unwrap_or("127.0.0.1");
+    let local_port = config.get("localPort").and_then(serde_json::Value::as_i64).unwrap_or(4096);
+    let local_url = format!("http://{}:{}", local_host, local_port);
+    let result = start_managed_process(
+        "cloudflared-desktop",
+        &std::env::var("CLOUDFLARED_BINARY").unwrap_or_else(|_| "cloudflared".to_string()),
+        &["tunnel", "--url", local_url.as_str()],
+    );
     serde_json::json!({
         "jobId": "start-cloudflare:desktop",
-        "status": "failed",
-        "message": "Cloudflare Tunnel start requires desktop cloudflared runtime support."
+        "status": result["status"],
+        "message": result["message"],
     })
 }
 
 #[tauri::command(rename_all = "snake_case")]
 fn stop_cloudflare_tunnel() -> serde_json::Value {
+    let result = stop_managed_process("cloudflared-desktop");
     serde_json::json!({
         "jobId": "stop-cloudflare:desktop",
-        "status": "succeeded",
-        "message": "Cloudflare Tunnel stopped."
+        "status": result["status"],
+        "message": result["message"]
     })
 }
 
@@ -284,8 +503,8 @@ fn stop_cloudflare_tunnel() -> serde_json::Value {
 fn retry_cloudflare_tunnel_step(step_id: String) -> serde_json::Value {
     serde_json::json!({
         "jobId": format!("retry-cloudflare:{}", step_id),
-        "status": "succeeded",
-        "message": format!("Cloudflare Tunnel step {} was retried.", step_id)
+        "status": "failed",
+        "message": format!("Cloudflare Tunnel step {} requires desktop cloudflared runtime support.", step_id)
     })
 }
 
@@ -420,7 +639,9 @@ pub fn run() {
 
 #[cfg(test)]
 mod tests {
-    use super::validate_json_config;
+    use super::{detect_tool_binaries, get_cloudflare_tunnel_status, get_managed_process_logs, read_config_from_path, retry_cloudflare_tunnel_step, save_config_to_path, start_managed_process, stop_cloudflare_tunnel, stop_managed_process, validate_json_config};
+    use std::fs;
+    use std::path::PathBuf;
 
     #[test]
     fn accepts_valid_json_config() {
@@ -430,5 +651,93 @@ mod tests {
     #[test]
     fn rejects_empty_json_config() {
         assert_eq!(validate_json_config(""), Err("Content cannot be empty".to_string()));
+    }
+
+    #[test]
+    fn saves_and_reads_config_from_filesystem_path() {
+        let path = temp_path("desktop-config.json");
+        let target = serde_json::json!({
+            "toolInstanceId": "opencode-desktop",
+            "kind": "opencode",
+            "path": path.to_string_lossy()
+        });
+
+        save_config_to_path(&target, "{\"theme\":\"dark\"}".to_string()).expect("save config");
+        let document = read_config_from_path(&target).expect("read config");
+
+        assert_eq!(document["content"], "{\"theme\":\"dark\"}");
+        assert_eq!(document["path"].as_str(), Some(path.to_string_lossy().as_ref()));
+        let _ = fs::remove_file(path);
+    }
+
+    #[test]
+    fn detects_known_desktop_tool_binaries_from_path() {
+        let detections = detect_tool_binaries(&["rustc"]);
+
+        assert_eq!(detections[0]["kind"], "rustc");
+        assert_eq!(detections[0]["detected"], true);
+        assert!(detections[0]["binaryPath"].as_str().is_some());
+    }
+
+    #[test]
+    fn fails_managed_process_start_for_missing_binary() {
+        let result = start_managed_process("missing-test-process", "definitely-missing-omo-frp-binary", &[]);
+
+        assert_eq!(result["jobId"], "start:missing-test-process");
+        assert_eq!(result["status"], "failed");
+        assert!(result["message"].as_str().unwrap_or_default().contains("Failed to start"));
+    }
+
+    #[test]
+    fn starts_logs_and_stops_managed_process() {
+        let (command, args) = long_running_echo_command();
+        let id = "managed-process-test";
+
+        let start = start_managed_process(id, &command, &args.iter().map(String::as_str).collect::<Vec<_>>());
+        let logs = wait_for_log(id, "desktop-ready");
+        let stop = stop_managed_process(id);
+
+        assert_eq!(start["status"], "succeeded");
+        assert!(logs.iter().any(|line| line["message"].as_str().unwrap_or_default().contains("desktop-ready")));
+        assert_eq!(stop["status"], "succeeded");
+    }
+
+    #[test]
+    fn cloudflare_desktop_actions_fail_precisely_when_not_managed() {
+        let status = get_cloudflare_tunnel_status();
+        let stop = stop_cloudflare_tunnel();
+        let retry = retry_cloudflare_tunnel_step("start_tunnel".to_string());
+
+        assert_eq!(status["running"], false);
+        assert!(status.get("publicUrl").is_none());
+        assert_eq!(stop["status"], "failed");
+        assert!(stop["message"].as_str().unwrap_or_default().contains("not running"));
+        assert_eq!(retry["status"], "failed");
+        assert!(retry["message"].as_str().unwrap_or_default().contains("requires desktop cloudflared runtime support"));
+    }
+
+    fn temp_path(name: &str) -> PathBuf {
+        std::env::temp_dir().join(format!("omo-frp-{}-{}", std::process::id(), name))
+    }
+
+    fn wait_for_log(id: &str, needle: &str) -> Vec<serde_json::Value> {
+        for _ in 0..40 {
+            let logs = get_managed_process_logs(id);
+            if logs.iter().any(|line| line["message"].as_str().unwrap_or_default().contains(needle)) {
+                return logs;
+            }
+            std::thread::sleep(std::time::Duration::from_millis(50));
+        }
+        get_managed_process_logs(id)
+    }
+
+    #[cfg(windows)]
+    fn long_running_echo_command() -> (String, Vec<String>) {
+        ("cmd.exe".to_string(), vec!["/C".to_string(), "echo desktop-ready & ping -n 5 127.0.0.1 >NUL".to_string()])
+    }
+
+    #[cfg(not(windows))]
+    fn long_running_echo_command() -> (String, Vec<String>) {
+        ("sh".to_string(), vec!["-c".to_string(), "echo desktop-ready; sleep 5".to_string()])
     }
 }

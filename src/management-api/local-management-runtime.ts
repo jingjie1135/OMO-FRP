@@ -409,29 +409,18 @@ export function createLocalManagementRuntime(options: CreateLocalManagementRunti
     },
 
     async startCloudflareTunnel(config: CloudflareTunnelConfigRequest): Promise<JobResult> {
+      const safetyFailure = checkCloudflareTunnelStartSafety(state.config, config)
+      if (safetyFailure) {
+        return safetyFailure
+      }
+
       if (options.executor) {
         return options.executor.startCloudflareTunnel(config)
       }
-
-      const opencode = state.config.toolInstances.find((tool) => tool.kind === "opencode")
-      if (opencode?.status !== "running") {
-        return createJobResult("start-cloudflare", "cloudflare", "failed", "OpenCode must be running before cloudflared starts.")
-      }
-      if (!hasProtectedCloudflareEndpoint(state.config, config.localPort)) {
-        return createJobResult(
-          "start-cloudflare",
-          "cloudflare",
-          "failed",
-          "OpenCode password protection must be configured on the Cloudflare endpoint before start.",
-        )
-      }
       const cloudflared = state.config.toolInstances.find((tool) => tool.kind === "cloudflared")
-      if (!cloudflared || cloudflared.installState === "missing" || !cloudflared.binaryPath) {
-        return createJobResult("start-cloudflare", "cloudflare", "failed", "cloudflared binary must be installed before start.")
-      }
       state.cloudflareConfig = cloneValue(config)
       state.cloudflareRunning = true
-      appendLog(state, now, cloudflared.id, `Cloudflare Tunnel started for ${buildCloudflareLocalUrl(config)}.`)
+      appendLog(state, now, cloudflared?.id ?? "cloudflared", `Cloudflare Tunnel started for ${buildCloudflareLocalUrl(config)}.`)
       return createJobResult("start-cloudflare", "cloudflare", "succeeded", "Cloudflare Tunnel is running.")
     },
 
@@ -797,6 +786,26 @@ function hasProtectedCloudflareEndpoint(config: AppConfig, localPort: number): b
       && endpoint.targetToolInstanceId === targetTool.id
       && (endpoint.authMode === "opencode-password" || endpoint.authMode === "both"),
   )
+}
+
+function checkCloudflareTunnelStartSafety(config: AppConfig, tunnelConfig: CloudflareTunnelConfigRequest): JobResult | null {
+  const opencode = config.toolInstances.find((tool) => tool.kind === "opencode")
+  if (opencode?.status !== "running") {
+    return createJobResult("start-cloudflare", "cloudflare", "failed", "OpenCode must be running before cloudflared starts.")
+  }
+  if (!hasProtectedCloudflareEndpoint(config, tunnelConfig.localPort)) {
+    return createJobResult(
+      "start-cloudflare",
+      "cloudflare",
+      "failed",
+      "OpenCode password protection must be configured on the Cloudflare endpoint before start.",
+    )
+  }
+  const cloudflared = config.toolInstances.find((tool) => tool.kind === "cloudflared")
+  if (!cloudflared || cloudflared.installState === "missing" || !cloudflared.binaryPath) {
+    return createJobResult("start-cloudflare", "cloudflare", "failed", "cloudflared binary must be installed before start.")
+  }
+  return null
 }
 
 function buildCloudflareCommands(config: CloudflareTunnelConfigRequest): string[] {
