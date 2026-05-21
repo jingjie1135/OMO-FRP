@@ -22,7 +22,7 @@ fn get_runtime_info() -> serde_json::Value {
         },
         "config": {
             "mode": "desktop",
-            "toolInstances": [],
+            "toolInstances": desktop_tool_instances(),
             "pluginConfigs": [],
             "publicEndpoints": [],
             "frpClients": []
@@ -37,7 +37,7 @@ fn detect_tools() -> serde_json::Value {
 
 #[tauri::command(rename_all = "snake_case")]
 fn list_tool_instances() -> serde_json::Value {
-    serde_json::json!([])
+    desktop_tool_instances()
 }
 
 #[tauri::command(rename_all = "snake_case")]
@@ -149,6 +149,58 @@ fn require_target_path(target: &serde_json::Value) -> Result<&str, String> {
 
 fn detect_tool_binaries(kinds: &[&str]) -> serde_json::Value {
     serde_json::Value::Array(kinds.iter().map(|kind| detect_tool_binary(kind)).collect())
+}
+
+fn desktop_tool_instances() -> serde_json::Value {
+    let detections = detect_tool_binaries(&["opencode", "frpc", "cloudflared"]);
+    let process_ids = managed_processes()
+        .lock()
+        .expect("managed process lock poisoned")
+        .keys()
+        .cloned()
+        .collect::<Vec<_>>();
+    let detected = |kind: &str| -> bool {
+        detections
+            .as_array()
+            .and_then(|items| items.iter().find(|item| item["kind"] == kind))
+            .and_then(|item| item["detected"].as_bool())
+            .unwrap_or(false)
+    };
+    let running = |id: &str| process_ids.iter().any(|process_id| process_id == id);
+    serde_json::json!([
+        {
+            "id": "opencode-desktop",
+            "kind": "opencode",
+            "displayName": "OpenCode",
+            "hostType": "desktop",
+            "installState": if detected("opencode") { "detected" } else { "missing" },
+            "binaryPath": "opencode",
+            "configDirectory": std::env::var("OPENCODE_CONFIG_DIR").unwrap_or_else(|_| ".opencode".to_string()),
+            "defaultPort": 4096,
+            "currentPort": 4096,
+            "status": if running("opencode-desktop") { "running" } else { "stopped" },
+        },
+        {
+            "id": "frpc-desktop",
+            "kind": "frpc",
+            "displayName": "frpc",
+            "hostType": "desktop",
+            "installState": if detected("frpc") { "detected" } else { "missing" },
+            "binaryPath": "frpc",
+            "defaultPort": 0,
+            "status": if running("frpc-desktop") { "running" } else { "stopped" },
+        },
+        {
+            "id": "cloudflared-desktop",
+            "kind": "cloudflared",
+            "displayName": "cloudflared",
+            "hostType": "desktop",
+            "installState": if detected("cloudflared") { "detected" } else { "missing" },
+            "binaryPath": "cloudflared",
+            "defaultPort": 0,
+            "status": if running("cloudflared-desktop") { "running" } else { "stopped" },
+        }
+    ])
 }
 
 fn detect_tool_binary(kind: &str) -> serde_json::Value {
@@ -639,7 +691,7 @@ pub fn run() {
 
 #[cfg(test)]
 mod tests {
-    use super::{detect_tool_binaries, get_cloudflare_tunnel_status, get_managed_process_logs, read_config_from_path, retry_cloudflare_tunnel_step, save_config_to_path, start_managed_process, stop_cloudflare_tunnel, stop_managed_process, validate_json_config};
+    use super::{detect_tool_binaries, get_cloudflare_tunnel_status, get_managed_process_logs, get_runtime_info, list_tool_instances, read_config_from_path, retry_cloudflare_tunnel_step, save_config_to_path, start_managed_process, stop_cloudflare_tunnel, stop_managed_process, validate_json_config};
     use std::fs;
     use std::path::PathBuf;
 
@@ -714,6 +766,17 @@ mod tests {
         assert!(stop["message"].as_str().unwrap_or_default().contains("not running"));
         assert_eq!(retry["status"], "failed");
         assert!(retry["message"].as_str().unwrap_or_default().contains("requires desktop cloudflared runtime support"));
+    }
+
+    #[test]
+    fn exposes_desktop_tool_instances_in_runtime_info() {
+        let info = get_runtime_info();
+        let instances = info["config"]["toolInstances"].as_array().expect("tool instances");
+
+        assert!(instances.iter().any(|tool| tool["id"] == "opencode-desktop" && tool["hostType"] == "desktop"));
+        assert!(instances.iter().any(|tool| tool["id"] == "frpc-desktop" && tool["kind"] == "frpc"));
+        assert!(instances.iter().any(|tool| tool["id"] == "cloudflared-desktop" && tool["kind"] == "cloudflared"));
+        assert_eq!(list_tool_instances(), info["config"]["toolInstances"]);
     }
 
     fn temp_path(name: &str) -> PathBuf {
