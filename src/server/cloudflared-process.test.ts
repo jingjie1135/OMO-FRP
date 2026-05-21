@@ -9,14 +9,15 @@ test("extracts trycloudflare public URL from cloudflared output", () => {
 
 test("starts a managed quick tunnel process and captures its public URL", async () => {
   const controller = createCloudflaredProcessController({
-    command: process.execPath,
+    command: process.platform === "win32" ? "cmd.exe" : "sh",
     argsForUrl: () => [
-      "--eval",
-      "setTimeout(() => { console.error('INF Requesting new quick Tunnel on trycloudflare.com'); console.log('https://alpha-beta.trycloudflare.com') }, 10); setInterval(() => {}, 1000)",
+      process.platform === "win32" ? "/C" : "-c",
+      process.platform === "win32" ? "echo INF Requesting new quick Tunnel on trycloudflare.com 1>&2 & echo https://alpha-beta.trycloudflare.com" : "echo 'INF Requesting new quick Tunnel on trycloudflare.com' >&2; echo https://alpha-beta.trycloudflare.com",
     ],
     now: () => new Date("2026-05-21T00:00:00.000Z"),
     urlTimeoutMs: 1_000,
     stopTimeoutMs: 100,
+    maxLogLines: 1,
   })
 
   try {
@@ -26,6 +27,7 @@ test("starts a managed quick tunnel process and captures its public URL", async 
 
     expect(result).toEqual({ ok: true, publicUrl: "https://alpha-beta.trycloudflare.com", message: "Cloudflare quick tunnel is running at https://alpha-beta.trycloudflare.com." })
     expect(status).toEqual({ running: true, publicUrl: "https://alpha-beta.trycloudflare.com" })
+    expect(logs).toHaveLength(1)
     expect(logs.some((line) => line.message.includes("trycloudflare.com"))).toBe(true)
   } finally {
     await controller.stop()

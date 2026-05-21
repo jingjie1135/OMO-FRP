@@ -8,6 +8,7 @@ export interface CloudflaredProcessControllerOptions {
   now?: () => Date
   urlTimeoutMs?: number
   stopTimeoutMs?: number
+  maxLogLines?: number
 }
 
 export interface CloudflaredStartResult {
@@ -34,12 +35,16 @@ export function createCloudflaredProcessController(options: CloudflaredProcessCo
   const now = options.now ?? (() => new Date())
   const urlTimeoutMs = options.urlTimeoutMs ?? 15_000
   const stopTimeoutMs = options.stopTimeoutMs ?? 1_000
+  const maxLogLines = options.maxLogLines ?? 500
   const logs: LogLine[] = []
   let child: ChildProcessWithoutNullStreams | undefined
   let publicUrl: string | undefined
 
   function appendLog(level: LogLine["level"], message: string): void {
     logs.push({ timestamp: now().toISOString(), level, message: redactSensitiveText(message) })
+    if (logs.length > maxLogLines) {
+      logs.splice(0, logs.length - maxLogLines)
+    }
   }
 
   return {

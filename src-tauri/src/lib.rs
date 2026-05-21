@@ -242,9 +242,14 @@ struct ManagedProcess {
 }
 
 static MANAGED_PROCESSES: OnceLock<Mutex<HashMap<String, ManagedProcess>>> = OnceLock::new();
+static MANAGED_PROCESS_LOGS: OnceLock<Mutex<HashMap<String, Vec<serde_json::Value>>>> = OnceLock::new();
 
 fn managed_processes() -> &'static Mutex<HashMap<String, ManagedProcess>> {
     MANAGED_PROCESSES.get_or_init(|| Mutex::new(HashMap::new()))
+}
+
+fn managed_process_logs() -> &'static Mutex<HashMap<String, Vec<serde_json::Value>>> {
+    MANAGED_PROCESS_LOGS.get_or_init(|| Mutex::new(HashMap::new()))
 }
 
 fn start_managed_process(id: &str, command: &str, args: &[&str]) -> serde_json::Value {
@@ -273,6 +278,7 @@ fn start_managed_process(id: &str, command: &str, args: &[&str]) -> serde_json::
 
     let stdout = child.stdout.take();
     let stderr = child.stderr.take();
+    managed_process_logs().lock().expect("managed process log lock poisoned").entry(id.to_string()).or_default();
     processes.insert(id.to_string(), ManagedProcess { child, logs: Vec::new() });
     drop(processes);
     capture_process_output(id.to_string(), "info", stdout);
@@ -306,11 +312,20 @@ fn stop_managed_process(id: &str) -> serde_json::Value {
 }
 
 fn get_managed_process_logs(id: &str) -> Vec<serde_json::Value> {
-    managed_processes()
+    let live_logs = managed_processes()
         .lock()
         .expect("managed process lock poisoned")
         .get(id)
         .map(|process| process.logs.clone())
+        .unwrap_or_default();
+    if !live_logs.is_empty() {
+        return live_logs;
+    }
+    managed_process_logs()
+        .lock()
+        .expect("managed process log lock poisoned")
+        .get(id)
+        .cloned()
         .unwrap_or_default()
 }
 
@@ -329,12 +344,19 @@ where
 }
 
 fn append_managed_process_log(id: &str, level: &str, message: &str) {
+    let log_line = serde_json::json!({
+        "timestamp": current_timestamp_string(),
+        "level": level,
+        "message": message,
+    });
+    managed_process_logs()
+        .lock()
+        .expect("managed process log lock poisoned")
+        .entry(id.to_string())
+        .or_default()
+        .push(log_line.clone());
     if let Some(process) = managed_processes().lock().expect("managed process lock poisoned").get_mut(id) {
-        process.logs.push(serde_json::json!({
-            "timestamp": current_timestamp_string(),
-            "level": level,
-            "message": message,
-        }));
+        process.logs.push(log_line);
     }
 }
 
@@ -752,6 +774,7 @@ mod tests {
         assert_eq!(start["status"], "succeeded");
         assert!(logs.iter().any(|line| line["message"].as_str().unwrap_or_default().contains("desktop-ready")));
         assert_eq!(stop["status"], "succeeded");
+        assert!(get_managed_process_logs(id).iter().any(|line| line["message"].as_str().unwrap_or_default().contains("desktop-ready")));
     }
 
     #[test]
