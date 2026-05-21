@@ -33,3 +33,21 @@ test("starts a managed quick tunnel process and captures its public URL", async 
     await controller.stop()
   }
 })
+
+test("stops the child process when cloudflared never reports a public URL", async () => {
+  const controller = createCloudflaredProcessController({
+    command: process.execPath,
+    argsForUrl: () => [
+      "--eval",
+      "setTimeout(() => {}, 5000)",
+    ],
+    urlTimeoutMs: 50,
+    stopTimeoutMs: 50,
+  })
+
+  const result = await controller.startQuickTunnel("http://127.0.0.1:4096")
+  const status = controller.status()
+
+  expect(result).toEqual({ ok: false, message: "Timed out waiting for cloudflared to report a trycloudflare URL." })
+  expect(status).toEqual({ running: false, publicUrl: undefined })
+})

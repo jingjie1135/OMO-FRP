@@ -7,6 +7,7 @@ services:
       MANAGEMENT_UI_PORT: ${MANAGEMENT_UI_PORT:-4080}
       MANAGEMENT_UI_STATIC_ROOT: /app/dist/ui
       MANAGEMENT_API_SESSION_TOKEN: ${MANAGEMENT_API_SESSION_TOKEN:-}
+      OPENCODE_REMOTE_STATE_ROOT: ${OPENCODE_REMOTE_STATE_ROOT:-/runtime}
       FRP_PANEL_INTERNAL_API_URL: ${FRP_PANEL_INTERNAL_API_URL:-http://frp-panel:${FRP_PANEL_API_PORT:-9000}}
       OPENCODE_INTERNAL_URL: ${OPENCODE_INTERNAL_URL:-http://opencode:${OPENCODE_PORT:-4096}}
       OPENCODE_CONTAINER_CONTROL_ENABLED: ${OPENCODE_CONTAINER_CONTROL_ENABLED:-false}
@@ -14,6 +15,8 @@ services:
       OPENCODE_COMPOSE_SERVICE: ${OPENCODE_COMPOSE_SERVICE:-opencode}
       FRP_PANEL_COMPOSE_PROJECT: ${FRP_PANEL_COMPOSE_PROJECT:-opencode-remote-platform}
       FRP_PANEL_COMPOSE_SERVICE: ${FRP_PANEL_COMPOSE_SERVICE:-frp-panel}
+    volumes:
+      - management-ui-state:/runtime
 
   opencode:
     image: ${OPENCODE_REMOTE_OPENCODE_IMAGE:-opencode-remote-platform-opencode:local}
@@ -67,6 +70,7 @@ services:
       - frp-panel
 
 volumes:
+  management-ui-state:
   opencode-config:
   opencode-workspaces:
   frp-panel-data:

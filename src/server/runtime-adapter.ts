@@ -1,7 +1,7 @@
 import { readdir } from "node:fs/promises"
 import { join, relative, resolve } from "node:path"
 import type { PublicEndpoint } from "../core/app-config/types"
-import { SERVER_CAPABILITIES, type AppConfig, type RuntimeInfo } from "../core/app-config/types"
+import { SERVER_CAPABILITIES, type AppConfig, type RuntimeInfo, type ToolInstance } from "../core/app-config/types"
 import { NodeStorage } from "../core/storage/node-storage"
 import type { StorageAdapter } from "../core/storage/storage-adapter"
 import type { RuntimeExecutor } from "../management-api/runtime-executor"
@@ -21,7 +21,6 @@ import type {
   JobResult,
   LogLine,
   ToolDetection,
-  ToolInstance,
   SecurityCheck,
   BackupSummary,
   Diagnostics,
@@ -116,8 +115,15 @@ export function createEmptyServerConfig(): AppConfig {
 }
 
 function createDurableServerRuntimeAdapter(adapter: ServerRuntimeAdapter, paths: ServerRuntimePaths, executor: RuntimeExecutor): ServerRuntimeAdapter {
-  async function persistConfig(): Promise<void> {
+  async function getHydratedRuntimeInfo(): Promise<RuntimeInfo> {
     const runtime = await adapter.getRuntimeInfo()
+    const detections = await adapter.detectTools()
+    const toolInstances = mergeManagedServerToolInstances(runtime.config.toolInstances, detections, paths.configDirectory)
+    return { ...runtime, config: { ...runtime.config, toolInstances } }
+  }
+
+  async function persistConfig(): Promise<void> {
+    const runtime = await getHydratedRuntimeInfo()
     await saveServerAppConfig(paths.appConfigPath, runtime.config)
   }
 
@@ -145,9 +151,9 @@ function createDurableServerRuntimeAdapter(adapter: ServerRuntimeAdapter, paths:
   }
 
   return {
-    async getRuntimeInfo() { return adapter.getRuntimeInfo() },
+    async getRuntimeInfo() { return getHydratedRuntimeInfo() },
     async detectTools() { return adapter.detectTools() },
-    async listToolInstances() { return adapter.listToolInstances() },
+    async listToolInstances() { return (await getHydratedRuntimeInfo()).config.toolInstances },
     async installTool(request) { return recordJob("install", request.kind, await withPersistedConfig(() => adapter.installTool(request))) },
     async startTool(instanceId) { return recordJob("start", instanceId, await adapter.startTool(instanceId)) },
     async stopTool(instanceId) { return recordJob("stop", instanceId, await adapter.stopTool(instanceId)) },
@@ -205,6 +211,73 @@ async function failUntilServerEndpointProvisioningExists(adapter: ServerRuntimeA
     status: "failed",
     message: `Server endpoint route provisioning is not connected yet. Configure Caddy/frp-panel route for ${endpoint.domain}, then retry.`,
   }
+}
+
+function mergeManagedServerToolInstances(existing: ToolInstance[], detections: ToolDetection[], defaultConfigDirectory: string): ToolInstance[] {
+  const merged = [...existing]
+  for (const detection of detections) {
+    const synthesized = createManagedServerToolInstance(detection, defaultConfigDirectory)
+    if (!synthesized) {
+      continue
+    }
+    const index = merged.findIndex((tool) => tool.id === synthesized.id)
+    if (index >= 0) {
+      merged[index] = {
+        ...merged[index],
+        installState: strongerInstallState(merged[index]?.installState, synthesized.installState),
+        binaryPath: merged[index]?.binaryPath ?? synthesized.binaryPath,
+        configDirectory: merged[index]?.configDirectory ?? synthesized.configDirectory,
+        defaultPort: merged[index]?.defaultPort ?? synthesized.defaultPort,
+        currentPort: merged[index]?.currentPort ?? synthesized.currentPort,
+      }
+      continue
+    }
+    merged.push(synthesized)
+  }
+  return merged
+}
+
+function strongerInstallState(current: ToolInstance["installState"] | undefined, next: ToolInstance["installState"]): ToolInstance["installState"] {
+  const rank: Record<ToolInstance["installState"], number> = {
+    missing: 0,
+    detected: 1,
+    installed: 2,
+    configured: 3,
+  }
+  if (!current) {
+    return next
+  }
+  return rank[current] >= rank[next] ? current : next
+}
+
+function createManagedServerToolInstance(detection: ToolDetection, defaultConfigDirectory: string): ToolInstance | null {
+  if (detection.kind === "opencode") {
+    return {
+      id: "opencode-server",
+      kind: "opencode",
+      displayName: "OpenCode",
+      hostType: "server",
+      installState: detection.detected ? "detected" : "missing",
+      binaryPath: detection.binaryPath,
+      configDirectory: detection.configDirectory ?? defaultConfigDirectory,
+      defaultPort: 4096,
+      currentPort: 4096,
+      status: "stopped",
+    }
+  }
+  if (detection.kind === "cloudflared") {
+    return {
+      id: "cloudflared-server",
+      kind: "cloudflared",
+      displayName: "cloudflared",
+      hostType: "server",
+      installState: detection.detected ? "detected" : "missing",
+      binaryPath: detection.binaryPath,
+      defaultPort: 0,
+      status: "stopped",
+    }
+  }
+  return null
 }
 
 function constrainConfigTarget(paths: ServerRuntimePaths, target: ConfigTarget): ConfigTarget {

@@ -20,6 +20,8 @@
 - `deploy/server/Caddyfile`：HTTPS、Basic Auth、管理界面、OpenCode 和 frp-panel 反向代理配置。
 - `deploy/server/healthcheck.sh`：针对 frp-panel、Caddy 和服务器入口的本地健康检查脚本；OpenCode/插件检查由显式工具动作执行。
 
+默认 `docker-compose.yml` 还会把 `management-ui` 的运行时状态目录挂载到命名卷 `management-ui-state`，并通过 `OPENCODE_REMOTE_STATE_ROOT=/runtime` 保存 app config、jobs 和 redacted logs，避免容器重建时丢失管理界面运行时状态。
+
 ## 必需密钥
 
 启动服务前需要设置以下密钥：

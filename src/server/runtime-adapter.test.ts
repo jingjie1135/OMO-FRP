@@ -53,6 +53,41 @@ describe("persisted server runtime adapter", () => {
     }
   })
 
+  it("surfaces managed server tool instances on a clean state root", async () => {
+    const { restore } = await useTempStateRoot()
+    const server = createServer((_request, response) => {
+      response.writeHead(200, {
+        "access-control-allow-origin": "*",
+        connection: "close",
+        "content-type": "text/plain",
+      })
+      response.end("ok")
+    })
+    await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve))
+    const address = server.address()
+    if (!address || typeof address === "string") {
+      throw new Error("HTTP test server did not expose a TCP port")
+    }
+    const previousUrl = process.env.OPENCODE_INTERNAL_URL
+
+    try {
+      process.env.OPENCODE_INTERNAL_URL = `http://127.0.0.1:${address.port}`
+      const adapter = await createPersistedServerRuntimeAdapter()
+
+      const runtime = await adapter.getRuntimeInfo()
+      const instances = await adapter.listToolInstances()
+
+      expect(runtime.config.toolInstances.some((tool) => tool.id === "opencode-server")).toBe(true)
+      expect(instances.some((tool) => tool.id === "opencode-server" && tool.kind === "opencode")).toBe(true)
+      expect(instances.some((tool) => tool.id === "cloudflared-server" && tool.kind === "cloudflared")).toBe(true)
+    } finally {
+      if (previousUrl === undefined) delete process.env.OPENCODE_INTERNAL_URL
+      else process.env.OPENCODE_INTERNAL_URL = previousUrl
+      await new Promise<void>((resolve, reject) => server.close((error) => (error ? reject(error) : resolve())))
+      restore()
+    }
+  })
+
   it("persists endpoint changes across adapter instances", async () => {
     const { restore } = await useTempStateRoot()
     try {
@@ -178,7 +213,18 @@ describe("persisted server runtime adapter", () => {
 
   it("loads config files from server storage", async () => {
     const { restore } = await useTempStateRoot()
+    const server = createServer((_request, response) => {
+      response.writeHead(200, { "access-control-allow-origin": "*", "content-type": "text/plain" })
+      response.end("ok")
+    })
+    await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve))
+    const address = server.address()
+    if (!address || typeof address === "string") {
+      throw new Error("HTTP test server did not expose a TCP port")
+    }
+    const previousUrl = process.env.OPENCODE_INTERNAL_URL
     try {
+      process.env.OPENCODE_INTERNAL_URL = `http://127.0.0.1:${address.port}`
       const paths = createServerRuntimePaths()
       await saveServerAppConfig(paths.appConfigPath, {
         mode: "server",
@@ -206,6 +252,9 @@ describe("persisted server runtime adapter", () => {
       expect(config.toolInstances[0]?.installState).toBe("configured")
       expect(document.content).toBe("{}")
     } finally {
+      if (previousUrl === undefined) delete process.env.OPENCODE_INTERNAL_URL
+      else process.env.OPENCODE_INTERNAL_URL = previousUrl
+      await new Promise<void>((resolve, reject) => server.close((error) => (error ? reject(error) : resolve())))
       restore()
     }
   })

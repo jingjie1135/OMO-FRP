@@ -63,6 +63,10 @@ export function createCloudflaredProcessController(options: CloudflaredProcessCo
       const currentChild = child
       return new Promise((resolve) => {
         let settled = false
+        const cleanup = () => {
+          child = undefined
+          publicUrl = undefined
+        }
         const settle = (result: CloudflaredStartResult) => {
           if (settled) return
           settled = true
@@ -79,6 +83,8 @@ export function createCloudflaredProcessController(options: CloudflaredProcessCo
           }
         }
         const timer = setTimeout(() => {
+          currentChild.kill("SIGTERM")
+          cleanup()
           settle({ ok: false, message: "Timed out waiting for cloudflared to report a trycloudflare URL." })
         }, urlTimeoutMs)
 
@@ -86,10 +92,11 @@ export function createCloudflaredProcessController(options: CloudflaredProcessCo
         currentChild.stderr.on("data", (chunk) => handleOutput("warn", chunk))
         currentChild.on("error", (error) => {
           appendLog("error", error.message)
+          cleanup()
           settle({ ok: false, message: `cloudflared failed: ${error.message}` })
         })
         currentChild.on("exit", (code) => {
-          child = undefined
+          cleanup()
           if (!settled) {
             settle({ ok: false, message: `cloudflared exited before reporting a public URL${code === null ? "." : ` with code ${code}.`}` })
           }

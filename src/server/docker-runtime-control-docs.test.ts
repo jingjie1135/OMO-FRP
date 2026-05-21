@@ -13,4 +13,6 @@ test("server deployment guide documents Docker control as an explicit opt-in", a
   expect(guide).toContain("OPENCODE_CONTAINER_CONTROL_ENABLED=true")
   expect(guide).toContain("MANAGEMENT_API_SESSION_TOKEN")
   expect(guide).toContain("Docker socket")
+  expect(guide).toContain("OPENCODE_REMOTE_STATE_ROOT")
+  expect(guide).toContain("management-ui-state")
 })

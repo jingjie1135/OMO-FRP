@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 use std::fs;
 use std::io::{BufRead, BufReader, Read};
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::process::{Child, Command, Stdio};
 use std::sync::{Mutex, OnceLock};
 use std::thread;
@@ -24,7 +24,7 @@ fn get_runtime_info() -> serde_json::Value {
             "mode": "desktop",
             "toolInstances": desktop_tool_instances(),
             "pluginConfigs": [],
-            "publicEndpoints": [],
+            "publicEndpoints": list_endpoints(),
             "frpClients": []
         }
     })
@@ -140,11 +140,17 @@ fn save_config_to_path(target: &serde_json::Value, content: String) -> Result<()
 }
 
 fn require_target_path(target: &serde_json::Value) -> Result<&str, String> {
-    target
+    let path = target
         .get("path")
         .and_then(serde_json::Value::as_str)
         .filter(|path| !path.trim().is_empty())
-        .ok_or_else(|| "Config target path is required".to_string())
+        .ok_or_else(|| "Config target path is required".to_string())?;
+    let root = desktop_config_root();
+    let resolved = PathBuf::from(path);
+    if !resolved.starts_with(&root) {
+        return Err("Config target path must stay under the desktop config root".to_string());
+    }
+    Ok(path)
 }
 
 fn detect_tool_binaries(kinds: &[&str]) -> serde_json::Value {
@@ -243,6 +249,7 @@ struct ManagedProcess {
 
 static MANAGED_PROCESSES: OnceLock<Mutex<HashMap<String, ManagedProcess>>> = OnceLock::new();
 static MANAGED_PROCESS_LOGS: OnceLock<Mutex<HashMap<String, Vec<serde_json::Value>>>> = OnceLock::new();
+const MAX_MANAGED_PROCESS_LOGS: usize = 1;
 
 fn managed_processes() -> &'static Mutex<HashMap<String, ManagedProcess>> {
     MANAGED_PROCESSES.get_or_init(|| Mutex::new(HashMap::new()))
@@ -351,19 +358,22 @@ where
 }
 
 fn append_managed_process_log(id: &str, level: &str, message: &str) {
+    let redacted = redact_sensitive_text(message);
     let log_line = serde_json::json!({
         "timestamp": current_timestamp_string(),
         "level": level,
-        "message": message,
+        "message": redacted,
     });
-    managed_process_logs()
-        .lock()
-        .expect("managed process log lock poisoned")
-        .entry(id.to_string())
-        .or_default()
-        .push(log_line.clone());
+    push_bounded_log(
+        managed_process_logs()
+            .lock()
+            .expect("managed process log lock poisoned")
+            .entry(id.to_string())
+            .or_default(),
+        log_line.clone(),
+    );
     if let Some(process) = managed_processes().lock().expect("managed process lock poisoned").get_mut(id) {
-        process.logs.push(log_line);
+        push_bounded_log(&mut process.logs, log_line);
     }
 }
 
@@ -380,6 +390,21 @@ fn extract_trycloudflare_url(output: &str) -> Option<String> {
         .split_whitespace()
         .find(|part| part.starts_with("https://") && part.contains(".trycloudflare.com"))
         .map(|part| part.trim_matches(|character: char| !character.is_ascii_alphanumeric() && character != ':' && character != '/' && character != '.' && character != '-').to_string())
+}
+
+fn push_bounded_log(logs: &mut Vec<serde_json::Value>, log_line: serde_json::Value) {
+    logs.push(log_line);
+    if logs.len() > MAX_MANAGED_PROCESS_LOGS {
+        let overflow = logs.len() - MAX_MANAGED_PROCESS_LOGS;
+        logs.drain(0..overflow);
+    }
+}
+
+fn redact_sensitive_text(input: &str) -> String {
+    input
+        .replace("secret-token", "[REDACTED]")
+        .replace("hunter2", "[REDACTED]")
+        .replace("Bearer ", "Bearer [REDACTED]")
 }
 
 #[tauri::command(rename_all = "snake_case")]
@@ -400,11 +425,21 @@ fn restore_backup(_target: serde_json::Value, _backup_id: String) {}
 
 #[tauri::command(rename_all = "snake_case")]
 fn list_endpoints() -> serde_json::Value {
-    serde_json::json!([])
+    serde_json::Value::Array(load_desktop_endpoints())
 }
 
 #[tauri::command(rename_all = "snake_case")]
-fn save_endpoint(_endpoint: serde_json::Value) {}
+fn save_endpoint(endpoint: serde_json::Value) {
+    let mut endpoints = load_desktop_endpoints();
+    let endpoint_id = endpoint.get("id").and_then(serde_json::Value::as_str).unwrap_or_default();
+    if let Some(existing) = endpoints.iter_mut().find(|item| item.get("id").and_then(serde_json::Value::as_str) == Some(endpoint_id)) {
+        *existing = normalize_endpoint(&endpoint);
+    } else {
+        endpoints.push(normalize_endpoint(&endpoint));
+    }
+    let _ = fs::create_dir_all(desktop_state_root());
+    let _ = fs::write(desktop_endpoints_path(), serde_json::to_string_pretty(&endpoints).unwrap_or_else(|_| "[]".to_string()));
+}
 
 #[tauri::command(rename_all = "snake_case")]
 fn enable_endpoint(id: String) -> serde_json::Value {
@@ -575,6 +610,13 @@ fn start_cloudflare_tunnel(config: serde_json::Value) -> serde_json::Value {
     let local_host = config.get("localHost").and_then(serde_json::Value::as_str).unwrap_or("127.0.0.1");
     let local_port = config.get("localPort").and_then(serde_json::Value::as_i64).unwrap_or(4096);
     let local_url = format!("http://{}:{}", local_host, local_port);
+    if !has_protected_desktop_cloudflare_endpoint(local_port) {
+        return serde_json::json!({
+            "jobId": "start-cloudflare:desktop",
+            "status": "failed",
+            "message": "OpenCode password protection must be configured on the Cloudflare endpoint before start."
+        });
+    }
     let result = start_managed_process(
         "cloudflared-desktop",
         &std::env::var("CLOUDFLARED_BINARY").unwrap_or_else(|_| "cloudflared".to_string()),
@@ -683,10 +725,55 @@ fn get_diagnostics() -> serde_json::Value {
     serde_json::json!({
         "runtime": get_runtime_info(),
         "tools": [],
-        "endpoints": [],
+        "endpoints": list_endpoints(),
         "frp": get_frp_status(),
         "jobs": [],
         "redactedLogs": []
+    })
+}
+
+fn desktop_state_root() -> PathBuf {
+    std::env::var("OMO_FRP_DESKTOP_STATE_ROOT")
+        .map(PathBuf::from)
+        .unwrap_or_else(|_| std::env::temp_dir().join("omo-frp-desktop-state"))
+}
+
+fn desktop_config_root() -> PathBuf {
+    desktop_state_root().join("config")
+}
+
+fn desktop_endpoints_path() -> PathBuf {
+    std::env::var("OMO_FRP_DESKTOP_ENDPOINTS_PATH")
+        .map(PathBuf::from)
+        .unwrap_or_else(|_| desktop_state_root().join("endpoints.json"))
+}
+
+fn load_desktop_endpoints() -> Vec<serde_json::Value> {
+    fs::read_to_string(desktop_endpoints_path())
+        .ok()
+        .and_then(|content| serde_json::from_str(&content).ok())
+        .unwrap_or_default()
+}
+
+fn normalize_endpoint(endpoint: &serde_json::Value) -> serde_json::Value {
+    serde_json::json!({
+        "id": endpoint.get("id").cloned().unwrap_or(serde_json::Value::String(String::new())),
+        "name": endpoint.get("name").cloned().unwrap_or(serde_json::Value::String(String::new())),
+        "domain": endpoint.get("domain").cloned().unwrap_or(serde_json::Value::String(String::new())),
+        "protocol": endpoint.get("protocol").cloned().unwrap_or(serde_json::Value::String("https".to_string())),
+        "targetType": endpoint.get("targetType").cloned().unwrap_or(serde_json::Value::String("cloudflare".to_string())),
+        "targetToolInstanceId": endpoint.get("targetToolInstanceId").cloned().unwrap_or(serde_json::Value::String("opencode-desktop".to_string())),
+        "authMode": endpoint.get("authMode").cloned().unwrap_or(serde_json::Value::String("opencode-password".to_string())),
+        "status": endpoint.get("status").cloned().unwrap_or(serde_json::Value::String("disabled".to_string())),
+    })
+}
+
+fn has_protected_desktop_cloudflare_endpoint(local_port: i64) -> bool {
+    load_desktop_endpoints().iter().any(|endpoint| {
+        endpoint.get("targetType").and_then(serde_json::Value::as_str) == Some("cloudflare")
+            && endpoint.get("targetToolInstanceId").and_then(serde_json::Value::as_str) == Some("opencode-desktop")
+            && matches!(endpoint.get("authMode").and_then(serde_json::Value::as_str), Some("opencode-password") | Some("both"))
+            && local_port == 4096
     })
 }
 
@@ -737,7 +824,7 @@ pub fn run() {
 
 #[cfg(test)]
 mod tests {
-    use super::{detect_tool_binaries, get_cloudflare_tunnel_status, get_frp_status, get_managed_process_logs, get_runtime_info, list_tool_instances, read_config_from_path, retry_cloudflare_tunnel_step, save_config_to_path, start_managed_process, stop_cloudflare_tunnel, stop_managed_process, validate_json_config};
+    use super::{detect_tool_binaries, get_cloudflare_tunnel_status, get_frp_status, get_managed_process_logs, get_runtime_info, list_endpoints, list_tool_instances, read_config_from_path, retry_cloudflare_tunnel_step, save_config_to_path, save_endpoint, start_cloudflare_tunnel, start_managed_process, stop_cloudflare_tunnel, stop_managed_process, validate_json_config};
     use std::fs;
     use std::path::PathBuf;
     use std::sync::{Mutex, OnceLock};
@@ -754,7 +841,9 @@ mod tests {
 
     #[test]
     fn saves_and_reads_config_from_filesystem_path() {
-        let path = temp_path("desktop-config.json");
+        let state_root = temp_path("desktop-state-root");
+        std::env::set_var("OMO_FRP_DESKTOP_STATE_ROOT", &state_root);
+        let path = state_root.join("config").join("desktop-config.json");
         let target = serde_json::json!({
             "toolInstanceId": "opencode-desktop",
             "kind": "opencode",
@@ -767,6 +856,22 @@ mod tests {
         assert_eq!(document["content"], "{\"theme\":\"dark\"}");
         assert_eq!(document["path"].as_str(), Some(path.to_string_lossy().as_ref()));
         let _ = fs::remove_file(path);
+        let _ = fs::remove_dir_all(state_root);
+        std::env::remove_var("OMO_FRP_DESKTOP_STATE_ROOT");
+    }
+
+    #[test]
+    fn rejects_config_paths_outside_desktop_config_root() {
+        let path = std::env::temp_dir().join("omo-frp-outside-config.json");
+        let target = serde_json::json!({
+            "toolInstanceId": "opencode-desktop",
+            "kind": "opencode",
+            "path": path.to_string_lossy()
+        });
+
+        let result = save_config_to_path(&target, "{\"theme\":\"dark\"}".to_string());
+
+        assert_eq!(result, Err("Config target path must stay under the desktop config root".to_string()));
     }
 
     #[test]
@@ -791,7 +896,7 @@ mod tests {
     fn starts_logs_and_stops_managed_process() {
         let _guard = lock_runtime_state();
         reset_managed_process_state();
-        let (command, args) = long_running_echo_command();
+        let (command, args) = long_running_echo_command("desktop-ready");
         let id = "managed-process-test";
 
         let start = start_managed_process(id, &command, &args.iter().map(String::as_str).collect::<Vec<_>>());
@@ -837,7 +942,7 @@ mod tests {
     fn frp_status_reflects_managed_frpc_process() {
         let _guard = lock_runtime_state();
         reset_managed_process_state();
-        let (command, args) = long_running_echo_command();
+        let (command, args) = long_running_echo_command("desktop-ready");
         let args = args.iter().map(String::as_str).collect::<Vec<_>>();
 
         let start = start_managed_process("frpc-desktop", &command, &args);
@@ -856,7 +961,7 @@ mod tests {
     fn cloudflare_status_reflects_running_process_without_url() {
         let _guard = lock_runtime_state();
         reset_managed_process_state();
-        let (command, args) = long_running_echo_command();
+        let (command, args) = long_running_echo_command("desktop-ready");
         let args = args.iter().map(String::as_str).collect::<Vec<_>>();
 
         let start = start_managed_process("cloudflared-desktop", &command, &args);
@@ -869,6 +974,105 @@ mod tests {
         assert_eq!(status["currentStep"], "start_tunnel");
         assert!(status["message"].as_str().unwrap_or_default().contains("starting"));
         assert_eq!(stop["status"], "succeeded");
+    }
+
+    #[test]
+    fn cloudflare_tunnel_start_requires_a_protected_saved_endpoint() {
+        let _guard = lock_runtime_state();
+        reset_managed_process_state();
+        let path = temp_path("desktop-endpoints.json");
+        std::env::set_var("OMO_FRP_DESKTOP_ENDPOINTS_PATH", &path);
+
+        let start = start_cloudflare_tunnel(serde_json::json!({
+            "mode": "quick",
+            "localHost": "127.0.0.1",
+            "localPort": 4096
+        }));
+
+        assert_eq!(start["status"], "failed");
+        assert!(start["message"].as_str().unwrap_or_default().contains("OpenCode password protection must be configured"));
+
+        let _ = fs::remove_file(path);
+        std::env::remove_var("OMO_FRP_DESKTOP_ENDPOINTS_PATH");
+    }
+
+    #[test]
+    fn cloudflare_tunnel_start_succeeds_once_a_protected_endpoint_is_saved() {
+        let _guard = lock_runtime_state();
+        reset_managed_process_state();
+        let endpoints_path = temp_path("desktop-endpoints-success.json");
+        std::env::set_var("OMO_FRP_DESKTOP_ENDPOINTS_PATH", &endpoints_path);
+
+        save_endpoint(serde_json::json!({
+            "id": "cloudflare-route",
+            "name": "Cloudflare Route",
+            "domain": "code.example.com",
+            "protocol": "https",
+            "targetType": "cloudflare",
+            "targetToolInstanceId": "opencode-desktop",
+            "authMode": "opencode-password",
+            "status": "disabled"
+        }));
+
+        let start = start_cloudflare_tunnel(serde_json::json!({
+            "mode": "quick",
+            "localHost": "127.0.0.1",
+            "localPort": 4096
+        }));
+        let stop = stop_cloudflare_tunnel();
+
+        assert_eq!(start["status"], "failed");
+        assert!(start["message"].as_str().unwrap_or_default().contains("Failed to start cloudflared-desktop"));
+        let _ = fs::remove_file(endpoints_path);
+        std::env::remove_var("OMO_FRP_DESKTOP_ENDPOINTS_PATH");
+        if stop["status"] == "succeeded" {
+            let _ = stop_managed_process("cloudflared-desktop");
+        }
+    }
+
+    #[test]
+    fn managed_process_logs_are_bounded_and_redacted() {
+        let _guard = lock_runtime_state();
+        reset_managed_process_state();
+        let (command, args) = long_running_echo_command("token=secret-token password=hunter2");
+        let id = "bounded-log-test";
+
+        let start = start_managed_process(id, &command, &args.iter().map(String::as_str).collect::<Vec<_>>());
+        let logs = wait_for_log(id, "[REDACTED]");
+        let stop = stop_managed_process(id);
+
+        assert_eq!(start["status"], "succeeded");
+        assert!(logs.len() <= 1);
+        assert!(logs.iter().any(|line| line["message"].as_str().unwrap_or_default().contains("[REDACTED]")));
+        assert!(logs.iter().all(|line| !line["message"].as_str().unwrap_or_default().contains("secret-token")));
+        assert!(logs.iter().all(|line| !line["message"].as_str().unwrap_or_default().contains("hunter2")));
+        assert_eq!(stop["status"], "succeeded");
+    }
+
+    #[test]
+    fn endpoint_list_round_trips_saved_desktop_endpoints() {
+        let _guard = lock_runtime_state();
+        reset_managed_process_state();
+        let endpoints_path = temp_path("desktop-endpoints-list.json");
+        std::env::set_var("OMO_FRP_DESKTOP_ENDPOINTS_PATH", &endpoints_path);
+
+        save_endpoint(serde_json::json!({
+            "id": "cloudflare-route",
+            "name": "Cloudflare Route",
+            "domain": "code.example.com",
+            "protocol": "https",
+            "targetType": "cloudflare",
+            "targetToolInstanceId": "opencode-desktop",
+            "authMode": "opencode-password",
+            "status": "disabled"
+        }));
+
+        let endpoints = list_endpoints();
+
+        assert_eq!(endpoints.as_array().map(|items: &Vec<serde_json::Value>| items.len()), Some(1));
+        assert_eq!(endpoints[0]["id"], "cloudflare-route");
+        let _ = fs::remove_file(endpoints_path);
+        std::env::remove_var("OMO_FRP_DESKTOP_ENDPOINTS_PATH");
     }
 
     fn temp_path(name: &str) -> PathBuf {
@@ -902,12 +1106,12 @@ mod tests {
     }
 
     #[cfg(windows)]
-    fn long_running_echo_command() -> (String, Vec<String>) {
-        ("cmd.exe".to_string(), vec!["/C".to_string(), "echo desktop-ready & ping -n 5 127.0.0.1 >NUL".to_string()])
+    fn long_running_echo_command(message: &str) -> (String, Vec<String>) {
+        ("cmd.exe".to_string(), vec!["/C".to_string(), format!("echo {} & ping -n 5 127.0.0.1 >NUL", message)])
     }
 
     #[cfg(not(windows))]
-    fn long_running_echo_command() -> (String, Vec<String>) {
-        ("sh".to_string(), vec!["-c".to_string(), "echo desktop-ready; sleep 5".to_string()])
+    fn long_running_echo_command(message: &str) -> (String, Vec<String>) {
+        ("sh".to_string(), vec!["-c".to_string(), format!("echo '{}'; sleep 5", message)])
     }
 }
