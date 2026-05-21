@@ -171,7 +171,7 @@ describe("Cloudflare Tunnel page", () => {
     expect(container.textContent).toContain("cloudflared：已检测")
     expect(container.textContent).toContain("状态总览")
     expect(container.textContent).toContain("快速隧道")
-    expect(container.textContent).toContain("后端自动启动待接入")
+    expect(container.textContent).toContain("可直接用上方按钮启动快速隧道")
     expect(container.textContent).toContain("手动执行命令")
     expect(container.textContent).toContain("cloudflared tunnel --url http://127.0.0.1:4096 --token <redacted>")
     expect(container.textContent).not.toContain("secret-token")
@@ -250,7 +250,7 @@ describe("Cloudflare Tunnel page", () => {
     expect(retried).toEqual(["configure_dns"])
   })
 
-  it("renders an explicit Cloudflare placeholder when backend plan data is missing", () => {
+  it("renders fallback Cloudflare command guidance when backend plan data is missing", () => {
     const container = render(
       <CloudflareTunnelPage
         runtimeInfo={{
@@ -268,8 +268,8 @@ describe("Cloudflare Tunnel page", () => {
       />,
     )
 
-    expect(container.textContent).toContain("后端能力占位")
-    expect(container.textContent).toContain("当前后端尚未返回完整 Cloudflare Tunnel 执行计划")
+    expect(container.textContent).toContain("正在使用本地表单生成的命令摘要")
+    expect(container.textContent).toContain("运行时未返回完整计划时")
     expect(container.textContent).toContain("cloudflared tunnel --url http://127.0.0.1:4096")
     expect(container.textContent).toContain("保存隧道草稿")
   })

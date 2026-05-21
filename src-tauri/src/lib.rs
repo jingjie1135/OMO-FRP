@@ -608,7 +608,7 @@ fn get_security_checks() -> serde_json::Value {
             "id": "cleartext-secret-risk",
             "label": "Cleartext secret risk",
             "status": "pass",
-            "message": "Desktop bridge placeholder does not expose cleartext secret metadata."
+            "message": "Desktop bridge diagnostics do not expose cleartext secret metadata."
         },
         {
             "id": "log-redaction",

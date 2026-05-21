@@ -116,13 +116,13 @@ export function CloudflareTunnelPage(props: CloudflareTunnelPageProps) {
       )}
 
       {!props.plan && (
-        <section aria-label="Cloudflare backend placeholder" className="rounded-xl border border-dashed border-amber-300 bg-amber-50 p-5">
+        <section aria-label="Cloudflare fallback command guidance" className="rounded-xl border border-dashed border-amber-300 bg-amber-50 p-5">
           <h2 className="text-sm font-semibold text-amber-900 flex items-center">
             <AlertCircle className="w-4 h-4 mr-2" />
-            后端能力占位
+            正在使用本地表单生成的命令摘要
           </h2>
           <p className="text-sm text-amber-800 mt-2">
-            当前后端尚未返回完整 Cloudflare Tunnel 执行计划。界面会先展示可保存的草稿、手动命令和步骤占位，等后端接入后可直接切换为自动执行。
+            运行时未返回完整计划时，界面会基于当前草稿展示可保存配置和手动命令；启动按钮仍会请求后端执行并显示真实结果。
           </p>
         </section>
       )}
@@ -224,7 +224,7 @@ function QuickTunnelFlow({ plan, publicUrl, localUrl, commands }: { plan?: Cloud
         <FlowFact label="本地目标" value={localUrl} />
         <FlowFact label="临时公网地址" value={publicUrl} />
         <div className="rounded-lg border border-blue-100 bg-blue-50 p-4 text-sm text-blue-800">
-          后端自动启动待接入；当前可先使用右侧“手动执行命令”完成快速隧道启动。
+          可直接用上方按钮启动快速隧道；如果自动执行失败，再复制右侧命令到目标机器排查。
         </div>
         <CommandSummary commands={commands} />
         <Notes plan={plan} />
@@ -291,7 +291,7 @@ function ManualCommandPanel({ commands }: { commands: string[] }) {
       </div>
       <pre className="p-5 text-xs leading-relaxed overflow-x-auto whitespace-pre-wrap font-mono">{commands.map(redactCloudflareTunnelText).join("\n")}</pre>
       <div className="px-5 py-4 border-t border-slate-800 text-xs text-slate-400">
-        后端自动化未接入或失败时，可先复制以上命令到目标机器执行。
+        自动化执行失败时，可复制以上命令到目标机器排查。
       </div>
     </aside>
   )

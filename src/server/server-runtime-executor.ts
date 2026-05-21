@@ -121,7 +121,7 @@ export function createServerRuntimeExecutor(options: ServerRuntimeExecutorOption
       return { jobId: "stop-cloudflare:server", status: result.ok ? "succeeded" as const : "failed" as const, message: result.message }
     },
     async retryCloudflareTunnelStep(stepId) {
-      return { jobId: `retry-cloudflare:${stepId}`, status: "failed", message: "Cloudflare retry is not connected yet." }
+      return { jobId: `retry-cloudflare:${stepId}`, status: "failed", message: `Cloudflare step retry is only available for named tunnel workflows. Step ${stepId} cannot be retried by the quick tunnel runtime.` }
     },
   }
 }
