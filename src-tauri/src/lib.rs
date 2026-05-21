@@ -329,6 +329,13 @@ fn get_managed_process_logs(id: &str) -> Vec<serde_json::Value> {
         .unwrap_or_default()
 }
 
+fn is_managed_process_running(id: &str) -> bool {
+    managed_processes()
+        .lock()
+        .expect("managed process lock poisoned")
+        .contains_key(id)
+}
+
 fn capture_process_output<R>(id: String, level: &'static str, stream: Option<R>)
 where
     R: Read + Send + 'static,
@@ -419,9 +426,18 @@ fn disable_endpoint(id: String) -> serde_json::Value {
 
 #[tauri::command(rename_all = "snake_case")]
 fn get_frp_status() -> serde_json::Value {
+    if is_managed_process_running("frpc-desktop") {
+        return serde_json::json!({
+            "mode": "client",
+            "running": true,
+            "status": "ready",
+            "message": "frpc is running."
+        });
+    }
     serde_json::json!({
         "mode": "client",
         "running": false,
+        "status": "idle",
         "message": "frpc is not running yet."
     })
 }
@@ -467,6 +483,14 @@ fn get_cloudflare_tunnel_status() -> serde_json::Value {
             "message": format!("Cloudflare Tunnel is running at {}.", url),
             "publicUrl": url,
             "currentStep": "verify_public_access"
+        });
+    }
+    if is_managed_process_running("cloudflared-desktop") {
+        return serde_json::json!({
+            "mode": "quick",
+            "running": true,
+            "message": "Cloudflare Tunnel is starting and waiting for a trycloudflare URL.",
+            "currentStep": "start_tunnel"
         });
     }
     serde_json::json!({
@@ -713,7 +737,7 @@ pub fn run() {
 
 #[cfg(test)]
 mod tests {
-    use super::{detect_tool_binaries, get_cloudflare_tunnel_status, get_managed_process_logs, get_runtime_info, list_tool_instances, read_config_from_path, retry_cloudflare_tunnel_step, save_config_to_path, start_managed_process, stop_cloudflare_tunnel, stop_managed_process, validate_json_config};
+    use super::{detect_tool_binaries, get_cloudflare_tunnel_status, get_frp_status, get_managed_process_logs, get_runtime_info, list_tool_instances, read_config_from_path, retry_cloudflare_tunnel_step, save_config_to_path, start_managed_process, stop_cloudflare_tunnel, stop_managed_process, validate_json_config};
     use std::fs;
     use std::path::PathBuf;
 
@@ -800,6 +824,40 @@ mod tests {
         assert!(instances.iter().any(|tool| tool["id"] == "frpc-desktop" && tool["kind"] == "frpc"));
         assert!(instances.iter().any(|tool| tool["id"] == "cloudflared-desktop" && tool["kind"] == "cloudflared"));
         assert_eq!(list_tool_instances(), info["config"]["toolInstances"]);
+    }
+
+    #[test]
+    fn frp_status_reflects_managed_frpc_process() {
+        let (command, args) = long_running_echo_command();
+        let args = args.iter().map(String::as_str).collect::<Vec<_>>();
+
+        let start = start_managed_process("frpc-desktop", &command, &args);
+        let status = get_frp_status();
+        let stop = stop_managed_process("frpc-desktop");
+
+        assert_eq!(start["status"], "succeeded");
+        assert_eq!(status["mode"], "client");
+        assert_eq!(status["running"], true);
+        assert_eq!(status["status"], "ready");
+        assert!(status["message"].as_str().unwrap_or_default().contains("frpc is running"));
+        assert_eq!(stop["status"], "succeeded");
+    }
+
+    #[test]
+    fn cloudflare_status_reflects_running_process_without_url() {
+        let (command, args) = long_running_echo_command();
+        let args = args.iter().map(String::as_str).collect::<Vec<_>>();
+
+        let start = start_managed_process("cloudflared-desktop", &command, &args);
+        let status = get_cloudflare_tunnel_status();
+        let stop = stop_managed_process("cloudflared-desktop");
+
+        assert_eq!(start["status"], "succeeded");
+        assert_eq!(status["mode"], "quick");
+        assert_eq!(status["running"], true);
+        assert_eq!(status["currentStep"], "start_tunnel");
+        assert!(status["message"].as_str().unwrap_or_default().contains("starting"));
+        assert_eq!(stop["status"], "succeeded");
     }
 
     fn temp_path(name: &str) -> PathBuf {
