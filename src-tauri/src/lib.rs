@@ -740,6 +740,7 @@ mod tests {
     use super::{detect_tool_binaries, get_cloudflare_tunnel_status, get_frp_status, get_managed_process_logs, get_runtime_info, list_tool_instances, read_config_from_path, retry_cloudflare_tunnel_step, save_config_to_path, start_managed_process, stop_cloudflare_tunnel, stop_managed_process, validate_json_config};
     use std::fs;
     use std::path::PathBuf;
+    use std::sync::{Mutex, OnceLock};
 
     #[test]
     fn accepts_valid_json_config() {
@@ -788,6 +789,8 @@ mod tests {
 
     #[test]
     fn starts_logs_and_stops_managed_process() {
+        let _guard = lock_runtime_state();
+        reset_managed_process_state();
         let (command, args) = long_running_echo_command();
         let id = "managed-process-test";
 
@@ -803,6 +806,8 @@ mod tests {
 
     #[test]
     fn cloudflare_desktop_actions_fail_precisely_when_not_managed() {
+        let _guard = lock_runtime_state();
+        reset_managed_process_state();
         let status = get_cloudflare_tunnel_status();
         let stop = stop_cloudflare_tunnel();
         let retry = retry_cloudflare_tunnel_step("start_tunnel".to_string());
@@ -817,6 +822,8 @@ mod tests {
 
     #[test]
     fn exposes_desktop_tool_instances_in_runtime_info() {
+        let _guard = lock_runtime_state();
+        reset_managed_process_state();
         let info = get_runtime_info();
         let instances = info["config"]["toolInstances"].as_array().expect("tool instances");
 
@@ -828,6 +835,8 @@ mod tests {
 
     #[test]
     fn frp_status_reflects_managed_frpc_process() {
+        let _guard = lock_runtime_state();
+        reset_managed_process_state();
         let (command, args) = long_running_echo_command();
         let args = args.iter().map(String::as_str).collect::<Vec<_>>();
 
@@ -845,6 +854,8 @@ mod tests {
 
     #[test]
     fn cloudflare_status_reflects_running_process_without_url() {
+        let _guard = lock_runtime_state();
+        reset_managed_process_state();
         let (command, args) = long_running_echo_command();
         let args = args.iter().map(String::as_str).collect::<Vec<_>>();
 
@@ -873,6 +884,21 @@ mod tests {
             std::thread::sleep(std::time::Duration::from_millis(50));
         }
         get_managed_process_logs(id)
+    }
+
+    fn lock_runtime_state() -> std::sync::MutexGuard<'static, ()> {
+        static LOCK: OnceLock<Mutex<()>> = OnceLock::new();
+        LOCK.get_or_init(|| Mutex::new(())).lock().expect("test runtime state lock poisoned")
+    }
+
+    fn reset_managed_process_state() {
+        let mut processes = super::managed_processes().lock().expect("managed process lock poisoned");
+        for (_, mut process) in processes.drain() {
+            let _ = process.child.kill();
+            let _ = process.child.wait();
+        }
+        drop(processes);
+        super::managed_process_logs().lock().expect("managed process log lock poisoned").clear();
     }
 
     #[cfg(windows)]

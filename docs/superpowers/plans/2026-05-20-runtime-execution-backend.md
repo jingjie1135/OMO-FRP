@@ -1106,6 +1106,13 @@ git commit -m "chore: 增加统一验证脚本"
 
 ## Acceptance Criteria by Milestone
 
+### Implementation status as of 2026-05-21
+
+- Beta 1 server runtime is implemented: execution delegates through `RuntimeExecutor`, persisted state/job/log stores are wired, backups use filesystem storage, and diagnostics/log output is redacted.
+- Beta 2 Docker/server runtime is implemented for OpenCode, FRP, and Cloudflare quick tunnels: OpenCode status/logs use HTTP and Docker state, FRP status/start/stop use frp-panel/container state, Cloudflare quick tunnels use a managed `cloudflared` process, and server endpoint enablement now fails closed with an actionable Caddy/frp-panel provisioning message instead of fake activation.
+- Beta 3 desktop preview runtime is implemented for the planned preview scope: the Tauri bridge reads/saves config files, detects `opencode`/`frpc`/`cloudflared`, exposes desktop tool instances, manages local OpenCode/frpc/cloudflared processes, keeps logs available after stop, and reports precise failures when a desktop capability is unavailable.
+- Production preview checks currently pass for durable jobs/logs, bounded/redacted logs, session/header protection, Docker smoke/build targets, and unsigned Tauri artifact labeling. The remaining productization gap is automated Caddy/frp-panel route mutation; current behavior is the accepted explicit actionable failure path.
+
 ### Beta 1: State-true server runtime
 
 - `RuntimeExecutor` exists and local runtime can delegate execution.
