@@ -205,8 +205,9 @@ function isAuthorized(headers: HeadersInit | undefined, sessionToken: string | u
 
 function isDockerControlRequest(path: string, method: string): boolean {
   return method === "POST"
-    && path.startsWith("/api/tools/")
-    && (path.endsWith("/start") || path.endsWith("/stop") || path.endsWith("/restart"))
+    && ((path.startsWith("/api/tools/") && (path.endsWith("/start") || path.endsWith("/stop") || path.endsWith("/restart")))
+      || path === "/api/frp/start"
+      || path === "/api/frp/stop")
 }
 
 async function parseJsonBody(body: BodyInit): Promise<unknown> {

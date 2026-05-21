@@ -105,7 +105,7 @@ describe("persisted server runtime adapter", () => {
 
       expect(result.status).toBe("failed")
       expect(diagnostics.jobs.some((job) => job.jobId === result.jobId)).toBe(true)
-      expect(logs.some((line) => line.message.includes("FRP server execution is not connected yet"))).toBe(true)
+      expect(logs.some((line) => line.message.includes("FRP container control is disabled"))).toBe(true)
     } finally {
       if (previousUrl === undefined) delete process.env.OPENCODE_INTERNAL_URL
       else process.env.OPENCODE_INTERNAL_URL = previousUrl

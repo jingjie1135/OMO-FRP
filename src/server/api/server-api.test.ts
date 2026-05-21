@@ -147,6 +147,18 @@ describe("server api", () => {
     expect(await response.json()).toEqual({ error: "Docker control requires an administrator session token." })
   })
 
+  it("requires an administrator session for FRP Docker control mode", async () => {
+    const api = createServerApi({ dockerControlRequiresSession: true })
+
+    const response = await api.request("/api/frp/start", {
+      method: "POST",
+      headers: { "content-type": "application/json", "x-management-ui-request": "1" },
+    })
+
+    expect(response.status).toBe(401)
+    expect(await response.json()).toEqual({ error: "Docker control requires an administrator session token." })
+  })
+
   it("rejects mutating requests without a management UI request header", async () => {
     const api = createServerApi({ sessionToken: "session-secret" })
 
