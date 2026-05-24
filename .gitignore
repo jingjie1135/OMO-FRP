@@ -22,6 +22,7 @@ src-tauri/gen/
 !.env.example
 
 # Tool caches
+.worktrees/
 .bun/
 .turbo/
 .cache/
