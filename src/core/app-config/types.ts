@@ -14,6 +14,7 @@ export interface RuntimeCapabilities {
   mode: RuntimeMode
   canManageFrpServer: boolean
   canManageFrpClient: boolean
+  canManageCloudflareTunnel?: boolean
   canInstallServerServices: boolean
   canAccessLocalFilesystem: boolean
   canManageSystemd: boolean
@@ -24,6 +25,7 @@ export const SERVER_CAPABILITIES: RuntimeCapabilities = {
   mode: "server",
   canManageFrpServer: true,
   canManageFrpClient: false,
+  canManageCloudflareTunnel: true,
   canInstallServerServices: true,
   canAccessLocalFilesystem: true,
   canManageSystemd: true,
@@ -34,13 +36,14 @@ export const DESKTOP_CAPABILITIES: RuntimeCapabilities = {
   mode: "desktop",
   canManageFrpServer: false,
   canManageFrpClient: true,
+  canManageCloudflareTunnel: true,
   canInstallServerServices: false,
   canAccessLocalFilesystem: true,
   canManageSystemd: false,
   canManageLocalProcesses: true,
 }
 
-export type ToolKind = Extract<CoreToolKind, "opencode"> | "future-tool"
+export type ToolKind = Extract<CoreToolKind, "opencode"> | "frpc" | "cloudflared" | "bun" | "oh-my-openagent" | "docker" | "docker-compose" | "caddy" | "future-tool"
 export type ToolHostType = "server" | "desktop"
 export type ToolInstallState = "missing" | "detected" | "installed" | "configured"
 export type ToolRuntimeStatus = "stopped" | "starting" | "running" | "error"
@@ -57,6 +60,10 @@ export interface ToolInstance {
   defaultPort: number
   currentPort?: number
   status: ToolRuntimeStatus
+  pid?: number
+  logPath?: string
+  lastExitCode?: number
+  lastError?: string
 }
 
 export interface ConfigPreset {

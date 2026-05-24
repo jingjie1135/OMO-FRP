@@ -1,20 +1,40 @@
 services:
+  management-ui:
+    image: ${OPENCODE_REMOTE_MANAGEMENT_UI_IMAGE:-opencode-remote-platform-management-ui:local}
+    restart: unless-stopped
+    environment:
+      MANAGEMENT_UI_HOST: 0.0.0.0
+      MANAGEMENT_UI_PORT: ${MANAGEMENT_UI_PORT:-4080}
+      MANAGEMENT_UI_STATIC_ROOT: /app/dist/ui
+
+  opencode:
+    image: ${OPENCODE_REMOTE_OPENCODE_IMAGE:-opencode-remote-platform-opencode:local}
+    restart: unless-stopped
+    environment:
+      OPENCODE_HOST: 0.0.0.0
+      OPENCODE_PORT: ${OPENCODE_PORT:-4096}
+      OPENCODE_CONFIG_DIR: /config
+      OPENCODE_WORKSPACE_ROOT: /workspaces
+      OPENCODE_SERVER_PASSWORD: ${OPENCODE_SERVER_PASSWORD:?set OPENCODE_SERVER_PASSWORD}
+    volumes:
+      - opencode-config:/config
+      - opencode-workspaces:/workspaces
+
   frp-panel:
     image: ${FRP_PANEL_IMAGE:-vaalacat/frp-panel:latest}
     restart: unless-stopped
     environment:
       APP_GLOBAL_SECRET: ${FRP_PANEL_APP_GLOBAL_SECRET:?set FRP_PANEL_APP_GLOBAL_SECRET}
       DB_DSN: ${FRP_PANEL_DB_DSN:-/data/data.db?_pragma=journal_mode(WAL)}
-      MASTER_API_HOST: 127.0.0.1
+      MASTER_API_HOST: 0.0.0.0
       MASTER_API_PORT: ${FRP_PANEL_API_PORT:-9000}
-      MASTER_RPC_HOST: 127.0.0.1
+      MASTER_RPC_HOST: 0.0.0.0
       MASTER_RPC_PORT: ${FRP_PANEL_RPC_PORT:-9001}
-      CLIENT_API_URL: ${FRP_PANEL_CLIENT_API_URL:?set FRP_PANEL_CLIENT_API_URL}
-      CLIENT_RPC_URL: ${FRP_PANEL_CLIENT_RPC_URL:?set FRP_PANEL_CLIENT_RPC_URL}
-      CLIENT_TLS_INSECURE_SKIP_VERIFY: ${FRP_PANEL_CLIENT_TLS_INSECURE_SKIP_VERIFY:-false}
+      CLIENT_API_URL: ${FRP_PANEL_INTERNAL_CLIENT_API_URL:-http://127.0.0.1:${FRP_PANEL_API_PORT:-9000}}
+      CLIENT_RPC_URL: ${FRP_PANEL_INTERNAL_CLIENT_RPC_URL:-wss://127.0.0.1:${FRP_PANEL_RPC_PORT:-9001}/rpc}
+      CLIENT_TLS_INSECURE_SKIP_VERIFY: ${FRP_PANEL_CLIENT_TLS_INSECURE_SKIP_VERIFY:-true}
     volumes:
       - frp-panel-data:/data
-    network_mode: host
     healthcheck:
       test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:${FRP_PANEL_API_PORT:-9000} >/dev/null || exit 1"]
       interval: 30s
@@ -26,15 +46,21 @@ services:
     restart: unless-stopped
     env_file:
       - .env
-    network_mode: host
+    ports:
+      - "80:80"
+      - "443:443"
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
       - caddy-data:/data
       - caddy-config:/config
     depends_on:
+      - management-ui
+      - opencode
       - frp-panel
 
 volumes:
+  opencode-config:
+  opencode-workspaces:
   frp-panel-data:
   caddy-data:
   caddy-config:

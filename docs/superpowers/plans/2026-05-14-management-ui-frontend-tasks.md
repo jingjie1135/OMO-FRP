@@ -1,0 +1,593 @@
+# Management UI Frontend Task Tracker
+
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+
+**Goal:** Track the management UI PRD as staged, checkable work so each completed phase can be marked with `[x]` after verification.
+
+**Architecture:** Keep the React UI shared across server Web and Tauri desktop runtimes. All UI features must call `ManagementClient`; runtime-specific behavior stays behind the server HTTP client, Tauri invoke client, and backend/runtime adapters. The tracker separates already completed foundations from remaining interactive product loops.
+
+**Tech Stack:** TypeScript, React 19, Bun test, Vite, Tauri, `ManagementClient`, server HTTP APIs, Tauri invoke bridge.
+
+---
+
+## Source Documents
+
+- Product PRD: `docs/superpowers/specs/2026-05-14-management-ui-frontend-prd.md`
+- Dual-runtime architecture plan: `docs/superpowers/plans/2026-05-11-management-ui-dual-runtime.md`
+- Dashboard state plan: `docs/superpowers/plans/2026-05-14-dashboard-state.md`
+
+---
+
+## How To Use This Tracker
+
+- Treat each `Task N` heading as one phase.
+- Mark the phase checkbox as `[x]` only after every subtask in that phase is done and the phase verification commands pass.
+- If a phase is split into smaller delivery slices, add nested checkboxes under that phase before marking the phase complete.
+- Do not mark a phase complete because files exist; mark it complete because the user-facing behavior and tests meet the acceptance checklist.
+- Commit checkpoints require an explicit user request before running `git commit` or `git push`.
+
+---
+
+## Phase Status Overview
+
+- [x] **Task 0: PRD and architecture baseline**
+- [x] **Task 1: Runnable shared frontend shell and Dashboard foundation**
+- [x] **Task 2: Upgrade feature skeletons into real interactive React pages**
+- [x] **Task 3: Shared async action, job, error, and refresh infrastructure**
+- [x] **Task 4: Tools detection, install, process control, and logs loop**
+- [x] **Task 5: Config, preset, backup, and restore loop**
+- [x] **Task 6: Endpoint management and safety-check loop**
+- [x] **Task 7: FRP server/client management loop**
+- [x] **Task 8: Cloudflare Tunnel quick/named flow**
+- [x] **Task 9: Settings, security checks, backup summary, and diagnostics export**
+- [x] **Task 10: Cross-feature integration, acceptance pass, and release readiness**
+
+---
+
+## Task 0: PRD and Architecture Baseline
+
+**Status:** Complete.
+
+**Purpose:** Establish the product target, runtime boundary, and high-level implementation direction.
+
+**Files:**
+
+- Complete: `docs/superpowers/specs/2026-05-14-management-ui-frontend-prd.md`
+- Complete: `docs/superpowers/plans/2026-05-11-management-ui-dual-runtime.md`
+- Complete: `docs/superpowers/plans/2026-05-14-dashboard-state.md`
+- Complete: `docs/superpowers/plans/2026-05-14-management-ui-frontend-tasks.md`
+
+**Checklist:**
+
+- [x] Define product goals, non-goals, user roles, server Web mode, and Tauri desktop mode.
+- [x] Define capability-driven UI behavior using `RuntimeCapabilities`.
+- [x] Define functional domains: Dashboard, Tools, Config, Endpoints, FRP, Settings, Logs / Jobs.
+- [x] Define safety rules: explicit actions, endpoint disabled by default, high-risk confirmations, no frontend secret persistence.
+- [x] Create this staged task tracker from the PRD.
+
+**Verification:**
+
+- [x] PRD exists and contains acceptance sections for Dashboard, Tools, Config, Endpoints, FRP, and security.
+- [x] Tracker has one parent checkbox per implementation phase.
+
+---
+
+## Task 1: Runnable Shared Frontend Shell and Dashboard Foundation
+
+**Status:** Complete.
+
+**Purpose:** Make the frontend launch through the shared runtime boundary and provide a resilient Dashboard foundation.
+
+**Files:**
+
+- Complete: `src/ui/main.tsx`
+- Complete: `src/ui/app/ManagementDashboardApp.tsx`
+- Complete: `src/ui/app/ManagementDashboardApp.test.tsx`
+- Complete: `src/ui/browser-management-client.ts`
+- Complete: `src/ui/api/server-management-client.ts`
+- Complete: `src/ui/api/tauri-management-client.ts`
+- Complete: `src/ui/features/dashboard/DashboardView.tsx`
+- Complete: `src/ui/features/dashboard/DashboardView.test.tsx`
+- Complete: `src/ui/features/dashboard/dashboard-view-model.ts`
+- Complete: `src/ui/features/dashboard/dashboard-view-model.test.ts`
+- Complete: `src/ui/features/dashboard/use-dashboard-state.ts`
+- Complete: `src/ui/features/dashboard/use-dashboard-state.test.tsx`
+- Complete: `bunfig.toml`
+- Complete: `tests/happydom.ts`
+
+**Checklist:**
+
+- [x] Render the React entry without preloading Dashboard data outside React.
+- [x] Create browser runtime selection between server HTTP and Tauri invoke clients.
+- [x] Keep `ManagementClient` as the only frontend API boundary.
+- [x] Add Dashboard initial loading state.
+- [x] Add Dashboard initial error and retry behavior.
+- [x] Add Dashboard manual refresh behavior.
+- [x] Preserve last successful Dashboard data when refresh fails.
+- [x] Add stale request protection for concurrent refreshes.
+- [x] Add unmount cleanup for Dashboard state updates.
+- [x] Render runtime capability matrix from `RuntimeCapabilities`.
+- [x] Add React DOM test environment with `happy-dom`.
+
+**Verification:**
+
+- [x] Dashboard targeted tests passed: `15 pass / 0 fail`.
+- [x] Full test suite passed: `86 pass / 0 fail`.
+- [x] `bun run typecheck` passed.
+- [x] `bun run build:ui` passed.
+- [x] `bun run build` passed.
+
+---
+
+## Task 2: Upgrade Feature Skeletons Into Real Interactive React Pages
+
+**Status:** Complete.
+
+**Purpose:** Convert the remaining string/logic skeletons into real React DOM pages while preserving the existing feature boundaries.
+
+**Files:**
+
+- Modify: `src/ui/app/App.tsx`
+- Modify: `src/ui/routes/routes.tsx`
+- Modify: `src/ui/layout/AppLayout.tsx`
+- Modify: `src/ui/features/tools/ToolsPage.tsx`
+- Modify: `src/ui/features/config/ConfigPage.tsx`
+- Modify: `src/ui/features/endpoints/EndpointsPage.tsx`
+- Modify: `src/ui/features/frp/FrpPage.tsx`
+- Modify: `src/ui/features/frp/ServerFrpPanel.tsx`
+- Modify: `src/ui/features/frp/ClientFrpPanel.tsx`
+- Modify: `src/ui/features/frp/FrpStatusCard.tsx`
+- Modify: `src/ui/features/frp/FrpConnectionCard.tsx`
+- Modify: `src/ui/features/settings/SettingsPage.tsx`
+- Test: `src/ui/features/management-pages.test.tsx`
+- Test: feature-specific `*.test.tsx` files beside each page.
+
+**Checklist:**
+
+- [x] Confirm skeleton feature files exist for Dashboard, Tools, Config, Endpoints, FRP, and Settings.
+- [x] Render app navigation through real React elements instead of string-only page output.
+- [x] Render Tools page as DOM sections for detections, instances, actions, and logs.
+- [x] Render Config page as DOM sections for target selection, editor, presets, and backups.
+- [x] Render Endpoints page as DOM sections for list, create/edit state, validation, enable, disable, and diagnostics.
+- [x] Render FRP page as DOM sections that branch on `canManageFrpServer` and `canManageFrpClient`.
+- [x] Render Settings page as DOM sections for runtime, security, backups, and diagnostics.
+- [x] Keep visual styling minimal; this phase validates behavior and structure, not visual design polish.
+- [x] Add tests that query DOM roles/text rather than comparing raw strings.
+
+**Acceptance:**
+
+- [x] Browser/Tauri shell can navigate to each primary feature domain.
+- [x] Unsupported capabilities are visible as disabled/unavailable states with reasons.
+- [x] No page calls shell, filesystem, systemd, or Tauri APIs directly; pages use `ManagementClient` only.
+- [x] Existing Dashboard behavior remains unchanged.
+
+**Verification:**
+
+- [x] Run: `bun test src/ui/features/management-pages.test.tsx`
+- [x] Run feature tests touched in this phase.
+- [x] Run: `bun run typecheck`
+- [x] Run: `bun run build:ui`
+
+---
+
+## Task 3: Shared Async Action, Job, Error, and Refresh Infrastructure
+
+**Status:** Complete.
+
+**Purpose:** Create reusable UI infrastructure for long-running actions so every feature handles pending, success, failure, retry, and refresh consistently.
+
+**Files:**
+
+- Create or modify: `src/ui/app/page-loaders.ts`
+- Create: `src/ui/app/action-runner.ts`
+- Create: `src/ui/app/action-runner.test.ts`
+- Create: `src/ui/components/AsyncActionStatus.tsx`
+- Create: `src/ui/components/AsyncActionStatus.test.tsx`
+- Create: `src/ui/components/ErrorState.tsx`
+- Create: `src/ui/components/ErrorState.test.tsx`
+- Modify: `src/management-api/client.ts`
+
+**Checklist:**
+
+- [x] Define a shared action state model: `idle`, `pending`, `succeeded`, `failed`.
+- [x] Represent job states from the PRD: `queued`, `running`, `succeeded`, `failed`.
+- [x] Ensure write operations never use optimistic success; only show temporary pending until backend result or refresh.
+- [x] Add a reusable error display with request target, status code when present, retry availability, and reauth hint.
+- [x] Add a reusable refresh helper that preserves unsaved form state.
+- [x] Add mutual-exclusion guards so the same resource cannot receive duplicate conflicting actions while pending.
+- [x] Add tests for pending, success, failure, retry, and duplicate-submit prevention.
+
+**Acceptance:**
+
+- [x] Tools, Config, Endpoints, FRP, and Settings can share the same action/error pattern.
+- [x] 401/403 handling stops sensitive follow-up requests and preserves unsaved form input.
+- [x] Network failures preserve the most recent successful data and allow retry.
+
+**Verification:**
+
+- [x] Run: `bun test src/ui/app/action-runner.test.ts src/ui/components/AsyncActionStatus.test.tsx src/ui/components/ErrorState.test.tsx`
+- [x] Run: `bun run typecheck`
+- [x] Run: `bun run build:ui`
+
+---
+
+## Task 4: Tools Detection, Install, Process Control, and Logs Loop
+
+**Status:** Complete.
+
+**Purpose:** Make Tools usable for detection, supported installation, start/stop/restart, and log viewing.
+
+**Files:**
+
+- Modify: `src/ui/features/tools/ToolsPage.tsx`
+- Create: `src/ui/features/tools/use-tools-state.ts`
+- Create: `src/ui/features/tools/use-tools-state.test.tsx`
+- Modify: `src/management-api/client.ts`
+- Modify: `src/ui/api/server-management-client.ts`
+- Modify: `src/ui/api/tauri-management-client.ts`
+- Modify: relevant server/Tauri runtime handlers when frontend contract changes require backend support.
+
+**Checklist:**
+
+- [x] Display detection entries for OpenCode, Bun, oh-my-openagent, frpc, cloudflared, Docker/Compose, and Caddy when returned by the runtime.
+- [x] Add explicit Detect action; do not run detection automatically on initial app load.
+- [x] Display tool instances with ID, kind, display name, host type, install state, run state, default port, current port, and config directory.
+- [x] Show install action only when the runtime supports installation and the tool is missing.
+- [x] Confirm install target, version, and affected paths before submitting install.
+- [x] Add start, stop, and restart actions for supported instances.
+- [x] Prevent duplicate action submission for the same instance while pending.
+- [x] Refresh tool instances and detection after successful install.
+- [x] Refresh tool instances, logs, and Dashboard after successful start/stop/restart.
+- [x] Show port-occupied and missing-password guidance when those failure reasons are returned.
+- [x] Display tool logs by instance with time, level, and redacted message.
+
+**Acceptance:**
+
+- [x] User can detect tools manually.
+- [x] User can install a supported missing tool only after confirmation.
+- [x] User can start, stop, and restart supported tool instances.
+- [x] Failed operations show a readable reason and a retry path.
+- [x] Logs are redacted before display.
+
+**Verification:**
+
+- [x] Run: `bun test src/ui/features/tools`
+- [x] Run: `bun run typecheck`
+- [x] Run: `bun run build:ui`
+
+---
+
+## Task 5: Config, Preset, Backup, and Restore Loop
+
+**Status:** Complete.
+
+**Purpose:** Let users read, edit, validate, save, preset, backup, and restore OpenCode and oh-my-openagent configuration safely.
+
+**Files:**
+
+- Modify: `src/ui/features/config/ConfigPage.tsx`
+- Create: `src/ui/features/config/use-config-state.ts`
+- Create: `src/ui/features/config/use-config-state.test.tsx`
+- Create: `src/ui/features/config/config-validation.ts`
+- Create: `src/ui/features/config/config-validation.test.ts`
+- Modify: `src/management-api/client.ts`
+- Modify: `src/ui/api/server-management-client.ts`
+- Modify: `src/ui/api/tauri-management-client.ts`
+- Modify: relevant server/Tauri runtime handlers when frontend contract changes require backend support.
+
+**Checklist:**
+
+- [x] List configuration targets for OpenCode and oh-my-openagent.
+- [x] Read config content, updated time, path, and missing/error state.
+- [x] Allow creating config when the target reports a missing config file.
+- [x] Add editor state that preserves unsaved user input across refresh failures.
+- [x] Validate empty content before submit.
+- [x] Validate JSON content in the frontend when the config format is JSON.
+- [x] Submit TOML/YAML content to backend validation and display backend field errors.
+- [x] Reject obvious pasted log fragments containing unredacted secret-like values.
+- [x] Confirm overwrite before saving over existing content.
+- [x] Refresh config after successful save.
+- [x] List presets and confirm preset name, target, affected range, and backup behavior before apply.
+- [x] Refresh config after successful preset apply.
+- [x] List backups with backup ID, created time, target, and path.
+- [x] Confirm restore target, backup ID, overwrite warning, and pre-restore backup behavior before restore.
+- [x] Refresh config and backup list after successful restore.
+
+**Acceptance:**
+
+- [x] User can read OpenCode and oh-my-openagent config.
+- [x] User can edit and save config without losing input on failure.
+- [x] User can apply presets with confirmation.
+- [x] User can restore backups with confirmation.
+- [x] Config write failures do not overwrite the previous valid config.
+
+**Verification:**
+
+- [x] Run: `bun test src/ui/features/config`
+- [x] Run: `bun run typecheck`
+- [x] Run: `bun run build:ui`
+
+---
+
+## Task 6: Endpoint Management and Safety-Check Loop
+
+**Status:** Complete.
+
+**Purpose:** Make public endpoint management safe and usable, with disabled-by-default behavior and explicit safety checks before exposure.
+
+**Files:**
+
+- Modify: `src/ui/features/endpoints/EndpointsPage.tsx`
+- Create: `src/ui/features/endpoints/use-endpoints-state.ts`
+- Create: `src/ui/features/endpoints/use-endpoints-state.test.tsx`
+- Create: `src/ui/features/endpoints/EndpointForm.tsx`
+- Create: `src/ui/features/endpoints/EndpointForm.test.tsx`
+- Modify: `src/management-api/client.ts`
+- Modify: `src/ui/api/server-management-client.ts`
+- Modify: `src/ui/api/tauri-management-client.ts`
+- Modify: relevant server/Tauri runtime handlers when frontend contract changes require backend support.
+
+**Checklist:**
+
+- [x] Display endpoint list with ID, name, domain or URL, protocol, target type, target tool instance, auth mode, and status.
+- [x] Support endpoint types: `server-local`, `desktop-frp`, and `cloudflare` when returned by runtime capabilities.
+- [x] Create new endpoints in disabled state by default.
+- [x] Edit endpoint name, domain or URL, protocol, target type, target instance, and auth mode.
+- [x] Validate domain or URL format before save.
+- [x] Validate target tool instance exists before save.
+- [x] Validate auth mode satisfies safety requirements before save.
+- [x] Validate target type is compatible with current runtime mode before save.
+- [x] Run safety checks before enable: OpenCode running, password configured, endpoint auth configured, FRP/Cloudflare available, target port reachable, public address generatable, no obvious endpoint conflict.
+- [x] Block enable when any safety check fails.
+- [x] Preserve endpoint previous state if enable fails.
+- [x] Confirm disable and preserve endpoint configuration after disable.
+- [x] Add endpoint diagnostics with target running, local port, FRP/Cloudflare reachability, auth completeness, recent error, and fix suggestion.
+
+**Acceptance:**
+
+- [x] User can list, create, edit, enable, disable, and diagnose endpoints.
+- [x] Unsafe endpoints cannot be enabled.
+- [x] Endpoint enable success shows public URL and auth mode.
+- [x] Disable does not delete endpoint configuration.
+
+**Verification:**
+
+- [x] Run: `bun test src/ui/features/endpoints`
+- [x] Run: `bun run typecheck`
+- [x] Run: `bun run build:ui`
+
+---
+
+## Task 7: FRP Server/Client Management Loop
+
+**Status:** Complete.
+
+**Purpose:** Complete FRP management for server and desktop modes so FRP status, configuration, start/stop, and failure guidance are usable.
+
+**Files:**
+
+- Modify: `src/ui/features/frp/FrpPage.tsx`
+- Modify: `src/ui/features/frp/ServerFrpPanel.tsx`
+- Modify: `src/ui/features/frp/ClientFrpPanel.tsx`
+- Modify: `src/ui/features/frp/EndpointRouteForm.tsx`
+- Modify: `src/ui/features/frp/FrpConnectionCard.tsx`
+- Modify: `src/ui/features/frp/FrpStatusCard.tsx`
+- Modify: `src/ui/features/frp/frp-panel-actions.ts`
+- Create: `src/ui/features/frp/use-frp-state.ts`
+- Create: `src/ui/features/frp/use-frp-state.test.tsx`
+- Modify: `src/management-api/client.ts`
+- Modify: `src/ui/api/server-management-client.ts`
+- Modify: `src/ui/api/tauri-management-client.ts`
+- Modify: relevant server/Tauri runtime handlers when frontend contract changes require backend support.
+
+**Checklist:**
+
+- [x] Keep FRP page branching based on `RuntimeCapabilities`.
+- [x] Server mode displays frp-panel URL, RPC URL, server address, bind port, dashboard status, client list, and desktop connection information.
+- [x] Server mode validates panel URL, RPC URL, server address, bind port, auth token ref, and masked token behavior before save.
+- [x] Server mode supports saving FRP server configuration.
+- [x] Server mode supports starting and stopping FRP server when capability allows it.
+- [x] Desktop mode displays server address, server port, token ref or imported connection config, local OpenCode port, subdomain/proxy name, generated frpc config, public URL, and connection status.
+- [x] Desktop mode validates OpenCode running, local port reachable, server address present, token ref present, subdomain/proxy name legal, and frpc binary available before start.
+- [x] Desktop mode supports saving FRP client configuration.
+- [x] Desktop mode supports starting and stopping frpc when capability allows it.
+- [x] Map FRP failure reasons to guidance: `auth_failed`, `api_unreachable`, `rpc_unreachable`, `proxy_not_ready`, `local_service_unreachable`, `client_not_ready`, `timeout`, and `unknown`.
+- [x] Refresh FRP status and endpoints after successful FRP start/stop.
+
+**Acceptance:**
+
+- [x] Server runtime only shows FRP server operations.
+- [x] Desktop runtime only shows FRP client operations.
+- [x] Unavailable runtime blocks FRP actions and explains why.
+- [x] FRP failures provide actionable suggestions.
+
+**Verification:**
+
+- [x] Run: `bun test src/ui/features/frp`
+- [x] Run: `bun run typecheck`
+- [x] Run: `bun run build:ui`
+
+---
+
+## Task 8: Cloudflare Tunnel Quick/Named Flow
+
+**Status:** Complete.
+
+**Purpose:** Add Cloudflare Tunnel UI flows described by the PRD without coupling the frontend directly to shell commands.
+
+**Files:**
+
+- Complete: `src/ui/features/cloudflare/CloudflareTunnelPage.tsx`
+- Complete: `src/ui/features/cloudflare/CloudflareTunnelPage.test.tsx`
+- Complete: `src/ui/features/cloudflare/CloudflareTunnelPageWrapper.tsx`
+- Complete: `src/ui/features/cloudflare/use-cloudflare-tunnel-state.ts`
+- Complete: `src/ui/features/cloudflare/use-cloudflare-tunnel-state.test.tsx`
+- Complete: `src/ui/routes/routes.tsx`
+- Complete: `src/ui/app/App.tsx`
+- Complete: `src/ui/app/page-loaders.ts`
+- Complete: `src/management-api/client.ts`
+- Complete: `src/management-api/types.ts`
+- Complete: `src/management-api/local-management-runtime.ts`
+- Complete: `src/server/api/index.ts`
+- Complete: `src/server/runtime-adapter.ts`
+- Complete: `src-tauri/src/lib.rs`
+- Complete: `src/ui/api/server-management-client.ts`
+- Complete: `src/ui/api/tauri-management-client.ts`
+
+**Checklist:**
+
+- [x] Add route entry for Cloudflare Tunnel when runtime capabilities expose tunnel support.
+- [x] Quick tunnel flow lets user choose local port and shows local target address.
+- [x] Quick tunnel flow shows command summary, generated temporary public URL when available, cloudflared detection state, and errors.
+- [x] Named tunnel flow collects hostname, tunnel name, local target port, and DNS route information.
+- [x] Named tunnel flow displays step states for login, create tunnel, configure DNS, write config, start tunnel, and verify public access.
+- [x] Each named tunnel step supports success, failure, and retry states.
+- [x] UI never directly executes shell commands; it requests runtime actions through `ManagementClient`.
+
+**Acceptance:**
+
+- [x] User can understand both quick and named tunnel flows from the UI.
+- [x] Failure state identifies the failed step and offers retry.
+- [x] No secret or command output is displayed without redaction.
+
+**Verification:**
+
+- [x] Run: `bun test src/ui/features/cloudflare`
+- [x] Run: `bun run typecheck`
+- [x] Run: `bun run build:ui`
+
+---
+
+## Task 9: Settings, Security Checks, Backup Summary, and Diagnostics Export
+
+**Status:** Complete.
+
+**Purpose:** Finish Settings as the safety and diagnostics hub for runtime information, security posture, backups, and redacted diagnostics.
+
+**Files:**
+
+- Modify: `src/ui/features/settings/SettingsPage.tsx`
+- Create: `src/ui/features/settings/use-settings-state.ts`
+- Create: `src/ui/features/settings/use-settings-state.test.tsx`
+- Create: `src/ui/features/settings/diagnostics-export.ts`
+- Create: `src/ui/features/settings/diagnostics-export.test.ts`
+- Modify: `src/management-api/client.ts`
+- Modify: `src/ui/api/server-management-client.ts`
+- Modify: `src/ui/api/tauri-management-client.ts`
+- Modify: `src/server/api/index.ts`
+- Modify: `src/server/runtime-adapter.ts`
+- Modify: `src/management-api/local-management-runtime.ts`
+
+**Checklist:**
+
+- [x] Display current runtime mode.
+- [x] Display platform version.
+- [x] Display config root directory when available.
+- [x] Display capability matrix or link to capability details.
+- [x] Display management API address in server mode.
+- [x] Display Tauri bridge status in desktop mode.
+- [x] Display security checks: OpenCode password, endpoint auth, FRP token ref, cleartext secret risk, log redaction, backup availability.
+- [x] Display backup count, last backup time, backup directory, and backup failure records.
+- [x] Add manual backup action when runtime supports it.
+- [x] Add backup restore entry point or link to Config restore flow.
+- [x] Add old-backup cleanup action only when backend reports support.
+- [x] Export diagnostics containing runtime info, tool detection, endpoint status, FRP status, recent job results, and redacted logs.
+- [x] Ensure exported diagnostics never contain cleartext secrets.
+
+**Acceptance:**
+
+- [x] Settings explains current runtime and security posture.
+- [x] Diagnostics export is useful for debugging and redacted by default.
+- [x] Backup actions are capability-gated and confirmed before high-risk operations.
+
+**Verification:**
+
+- [x] Run: `bun test src/ui/features/settings`
+- [x] Run: `bun run typecheck`
+- [x] Run: `bun run build:ui`
+
+- [x] Run: `bun run build`
+- [x] Run: `bun run lint` if the script remains available.
+- [x] Run: `bun run smoke` if the environment supports the smoke target.
+
+---
+
+## Task 10: Cross-Feature Integration, Acceptance Pass, and Release Readiness
+
+**Status:** Complete.
+
+**Purpose:** Verify the management UI as one cohesive product across server Web and Tauri desktop boundaries, then document the final release gates.
+
+**Files:**
+
+- Modify: `src/ui/app/App.tsx`
+- Modify: `src/ui/main.tsx`
+- Create: `src/ui/app/management-ui-acceptance.test.tsx`
+- Create: `src/ui/main.test.tsx`
+- Create: `src/shared/redact-sensitive-text.test.ts`
+- Modify: `src/shared/redact-sensitive-text.ts`
+- Modify: `src/ui/features/dashboard/use-dashboard-state.ts`
+- Modify: `src/ui/features/frp/use-frp-state.ts`
+- Modify: `docs/guide/management-ui.md`
+- Modify: `README.md`
+- Modify: `docs/superpowers/plans/2026-05-14-management-ui-frontend-tasks.md`
+
+**Checklist:**
+
+- [x] Add app-level handling for unreachable Management backend so startup failures render an understandable error state instead of throwing raw errors.
+- [x] Add production entry coverage for `src/ui/main.tsx` so real browser/Tauri startup shows the same redacted backend-unavailable state.
+- [x] Add a cross-runtime acceptance suite covering server and desktop shell rendering, capability-driven Cloudflare Tunnel routing, and app-level backend failure handling.
+- [x] Strengthen shared redaction coverage for environment variables, authorization schemes, camelCase secret keys, snake_case secret keys, and JSON-style secret fields.
+- [x] Add release-readiness checks that keep shared UI code inside the `ManagementClient` boundary and prevent direct shell/Tauri/storage access outside runtime client adapters.
+- [x] Update the management UI guide from skeleton-era wording to the completed Dashboard, Tools, Config, Endpoints, FRP, Cloudflare Tunnel, and Settings behavior.
+- [x] Update README verification guidance with UI build, Tauri `cargo check`, and the final acceptance test entry point.
+
+**Acceptance:**
+
+- [x] Frontend startup can report server/desktop runtime mode through the shared shell.
+- [x] Backend connection failures produce a readable error state with redacted error text.
+- [x] Dashboard and FRP state errors redact secret-bearing backend messages before they reach visible UI state.
+- [x] Cloudflare Tunnel navigation and page loading are controlled by `RuntimeCapabilities.canManageCloudflareTunnel`.
+- [x] Shared UI pages remain behind `ManagementClient`; only the browser/runtime client adapters touch Tauri invoke or transport details.
+- [x] Release documentation names the Task 10 acceptance suite and the full quality gate commands.
+
+**Verification:**
+
+- [x] RED observed: `bun test src/ui/app/management-ui-acceptance.test.tsx` failed before implementation on app-level backend error and stale release docs.
+- [x] RED observed after Oracle review: `bun test src/shared/redact-sensitive-text.test.ts src/ui/main.test.tsx src/ui/app/management-ui-acceptance.test.tsx src/ui/features/dashboard/use-dashboard-state.test.tsx src/ui/app/ManagementDashboardApp.test.tsx` failed on missing `bootManagementUi`, incomplete secret redaction, and raw dashboard error display.
+- [x] Run: `bun test src/shared/redact-sensitive-text.test.ts src/ui/main.test.tsx src/ui/app/management-ui-acceptance.test.tsx src/ui/features/dashboard/use-dashboard-state.test.tsx src/ui/app/ManagementDashboardApp.test.tsx src/ui/frontend-shell.test.ts src/ui/features/frp/use-frp-state.test.tsx` → `29 pass / 0 fail / 586 expect() calls`.
+- [x] Run: `bun test src/ui/app/management-ui-acceptance.test.tsx` → `5 pass / 0 fail / 464 expect() calls`.
+- [x] Run: `bun test src/ui/app/App.test.ts src/ui/app/page-loaders.test.ts src/ui/app/ManagementDashboardApp.test.tsx src/ui/features/management-pages.test.tsx src/ui/browser-management-client.test.ts` → `13 pass / 0 fail / 81 expect() calls`.
+- [x] Run: `bun test` → `186 pass / 0 fail / 1198 expect() calls`.
+- [x] Run: `bun run typecheck`.
+- [x] Run: `bun run build:ui`.
+- [x] Run: `bun run build`.
+- [x] Run: `bun run lint`.
+- [x] Run: `bun run smoke`.
+- [x] Run: `cargo check` in `src-tauri`.
+- [x] Run: `git diff --check` → only CRLF conversion warnings, no whitespace errors.
+
+---
+
+## Current Recommended Next Phase
+
+All tracked management UI frontend phases are complete. The next step is release/PR review, packaging polish, or a new follow-up plan for post-PRD enhancements.
+
+---
+
+## Completion Rules
+
+- A phase is complete only when its checklist, acceptance list, and verification commands pass.
+- If verification fails, leave the phase unchecked, fix the root cause, and rerun the failed verification.
+- If a phase requires backend or Tauri capability not yet present, add the exact missing `ManagementClient` method and runtime handler to that phase before marking it complete.
+- Do not remove failing tests to mark a phase complete.
+- Do not use type suppression to mark a phase complete.
+- Do not commit or push a phase unless the user explicitly asks for commit or push.
+
+---
+
+## Self-Review
+
+- Spec coverage: This tracker maps the PRD domains to staged work: Dashboard, Tools, Config, Endpoints, FRP, Cloudflare Tunnel, Settings, Jobs, errors, refresh strategy, security, and final acceptance.
+- Placeholder scan: The tracker contains no deferred placeholder sections; every unchecked phase has concrete files, behavior, acceptance, and verification commands.
+- Type consistency: The tracker consistently uses the existing `ManagementClient`, `RuntimeCapabilities`, runtime client, and feature directory boundaries already present in the repository.

@@ -4,24 +4,38 @@ node_modules/
 # Build output
 dist/
 build/
+out/
 coverage/
+src-tauri/target/
+src-tauri/gen/
 
 # Runtime/generated files
+.multica-final-comment.txt
 *.log
+*-debug.log*
+*.pid
+*.pid.lock
 *.tmp
 *.local
 .env
 .env.*
 !.env.example
-!.env.local
 
 # Tool caches
 .bun/
 .turbo/
 .cache/
+*.tsbuildinfo
+.eslintcache
+.nyc_output/
+test-results/
+**/*.rs.bk
+*.pdb
 
 # OS/editor files
 .DS_Store
 Thumbs.db
 .vscode/
 .idea/
+*.swp
+*.swo

@@ -1,10 +1,18 @@
+import type { FrpFailureReason, FrpPanelClientResource, FrpPanelProxyResource } from "../../management-api/types"
+
 export type FrpTransport = "tcp" | "kcp" | "websocket" | "quic"
 export type FrpProxyType = "http" | "tcp"
 
 export interface RemoteAccessOptions {
   panelUrl: string
+  panelApiUrl?: string
+  panelRpcUrl?: string
   authToken: string
+  serverId?: string
+  clientId?: string
+  clientSecret?: string
   proxyName?: string
+  frpBinary?: string
   serverAddr?: string
   serverPort?: number
   transport?: string
@@ -24,8 +32,14 @@ export interface RemoteAccessOptions {
 
 export interface NormalizedRemoteAccessOptions {
   panelUrl: string
+  panelApiUrl: string
+  panelRpcUrl: string
   authToken: string
+  serverId?: string
+  clientId: string
+  clientSecret?: string
   proxyName: string
+  frpBinary: string
   serverAddr: string
   serverPort: number
   transport: FrpTransport
@@ -58,10 +72,21 @@ export interface FrpcConfigInput {
   customDomain?: string
 }
 
+export interface RemoteAccessJoinCommand {
+  command: string
+  args: string[]
+}
+
 export interface RemoteAccessPlan {
   localUrl: string
   publicUrl: string
   frpcConfig: string
   diagnostics: string[]
+  status: "idle" | "provisioning" | "ready" | "error"
+  failureReason?: FrpFailureReason
+  suggestion?: string
+  client?: FrpPanelClientResource
+  proxy?: FrpPanelProxyResource
+  joinCommand?: RemoteAccessJoinCommand
   options: NormalizedRemoteAccessOptions
 }

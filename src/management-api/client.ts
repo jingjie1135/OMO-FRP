@@ -3,6 +3,11 @@ import type {
   ConfigDocument,
   ConfigPreset,
   ConfigTarget,
+  CloudflareTunnelConfigRequest,
+  CloudflareTunnelPlan,
+  CloudflareTunnelStatus,
+  CloudflareTunnelStepId,
+  ConfigValidationResult,
   FrpConfigRequest,
   FrpStatus,
   InstallToolRequest,
@@ -12,6 +17,9 @@ import type {
   RuntimeInfo,
   ToolDetection,
   ToolInstance,
+  SecurityCheck,
+  BackupSummary,
+  Diagnostics,
 } from "./types"
 
 export interface ManagementClient {
@@ -21,9 +29,11 @@ export interface ManagementClient {
   installTool(request: InstallToolRequest): Promise<JobResult>
   startTool(instanceId: string): Promise<JobResult>
   stopTool(instanceId: string): Promise<JobResult>
+  restartTool(instanceId: string): Promise<JobResult>
   getToolLogs(instanceId: string): Promise<LogLine[]>
 
   readConfig(target: ConfigTarget): Promise<ConfigDocument>
+  validateConfig(target: ConfigTarget, content: string): Promise<ConfigValidationResult>
   saveConfig(target: ConfigTarget, content: string): Promise<void>
   listPresets(target: ConfigTarget): Promise<ConfigPreset[]>
   applyPreset(target: ConfigTarget, presetId: string): Promise<void>
@@ -39,4 +49,25 @@ export interface ManagementClient {
   saveFrpConfig(config: FrpConfigRequest): Promise<void>
   startFrp(): Promise<JobResult>
   stopFrp(): Promise<JobResult>
+
+  getCloudflareTunnelStatus(): Promise<CloudflareTunnelStatus>
+  saveCloudflareTunnelConfig(config: CloudflareTunnelConfigRequest): Promise<void>
+  createCloudflareTunnelPlan(config: CloudflareTunnelConfigRequest): Promise<CloudflareTunnelPlan>
+  startCloudflareTunnel(config: CloudflareTunnelConfigRequest): Promise<JobResult>
+  stopCloudflareTunnel(): Promise<JobResult>
+  retryCloudflareTunnelStep(stepId: CloudflareTunnelStepId): Promise<JobResult>
+
+  getSecurityChecks?(): Promise<SecurityCheck[]>
+  getBackupSummary?(): Promise<BackupSummary>
+  runManualBackup?(): Promise<JobResult>
+  cleanupOldBackups?(): Promise<JobResult>
+  getDiagnostics?(): Promise<Diagnostics>
+}
+
+export interface SettingsManagementClient extends ManagementClient {
+  getSecurityChecks(): Promise<SecurityCheck[]>
+  getBackupSummary(): Promise<BackupSummary>
+  runManualBackup(): Promise<JobResult>
+  cleanupOldBackups(): Promise<JobResult>
+  getDiagnostics(): Promise<Diagnostics>
 }

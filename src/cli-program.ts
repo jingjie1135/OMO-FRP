@@ -26,6 +26,17 @@ function numberValue(args: string[], name: string, fallback?: number): number | 
   return parsed
 }
 
+function redactStartPlan(plan: ReturnType<typeof buildStartPlan>) {
+  return {
+    ...plan,
+    generatedPassword: plan.generatedPassword ? "<redacted>" : null,
+    env: {
+      ...plan.env,
+      OPENCODE_SERVER_PASSWORD: plan.env.OPENCODE_SERVER_PASSWORD ? "<redacted>" : undefined,
+    },
+  }
+}
+
 function printHelp(): void {
   console.log(`OpenCode Remote Platform ${VERSION}
 
@@ -77,7 +88,7 @@ function start(args: string[]): number {
   })
 
   if (hasFlag(args, "--json")) {
-    console.log(JSON.stringify({ ...plan, env: { ...plan.env, OPENCODE_SERVER_PASSWORD: plan.env.OPENCODE_SERVER_PASSWORD ? "<redacted>" : undefined } }, null, 2))
+    console.log(JSON.stringify(redactStartPlan(plan), null, 2))
     return 0
   }
 
@@ -122,10 +133,16 @@ function serverDeployPlan(args: string[]): number {
 async function remoteAccessCommand(args: string[]): Promise<number> {
   const options: RemoteAccessOptions = {
     panelUrl: valueAfter(args, "--panel-url") ?? "",
+    panelApiUrl: valueAfter(args, "--panel-api-url"),
+    panelRpcUrl: valueAfter(args, "--panel-rpc-url"),
     authToken: valueAfter(args, "--auth-token") ?? "",
+    serverId: valueAfter(args, "--server-id"),
+    clientId: valueAfter(args, "--client-id"),
+    clientSecret: valueAfter(args, "--client-secret"),
     password: valueAfter(args, "--password"),
     username: valueAfter(args, "--username"),
     proxyName: valueAfter(args, "--proxy-name"),
+    frpBinary: valueAfter(args, "--frp-binary"),
     serverAddr: valueAfter(args, "--server-addr"),
     serverPort: numberValue(args, "--server-port"),
     transport: valueAfter(args, "--transport"),
