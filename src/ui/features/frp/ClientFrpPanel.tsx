@@ -1,5 +1,5 @@
 import { getFrpPanelActions } from "./frp-panel-actions"
 
 export function ClientFrpPanel(): string {
-  return `client-frp:${getFrpPanelActions("desktop").join("|")}`
+  return `FRP 客户端:${getFrpPanelActions("desktop").join("|")}`
 }
