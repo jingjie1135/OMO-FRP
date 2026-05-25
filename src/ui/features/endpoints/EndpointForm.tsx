@@ -1,6 +1,7 @@
 import { useState, type ChangeEvent, type FormEvent } from "react"
 import type { PublicEndpoint, RuntimeInfo } from "../../../core/app-config/types"
 import { isEndpointTypeAvailable, isValidEndpointAddress, normalizeEndpointAddress, validateEndpoint } from "../../../core/endpoints/endpoint-service"
+import { ActionButton, FormField } from "../../components/FomoPrimitives"
 
 export interface EndpointFormProps {
   endpoint?: Partial<PublicEndpoint>
@@ -42,101 +43,80 @@ export function EndpointForm({ endpoint, runtimeInfo, onSave, onCancel }: Endpoi
   }
 
   return (
-    <form onSubmit={handleSubmit} noValidate className="space-y-4 p-4 border rounded shadow-sm bg-white">
-      <div>
-        <label className="block text-sm font-medium">Name</label>
+    <form onSubmit={handleSubmit} noValidate className="space-y-5 rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+      <FormField label="入口名称" help="用于在管理台中识别该公网入口。" error={errors.name}>
         <input
           name="name"
           value={formData.name}
           onChange={handleChange}
-          className="w-full border rounded p-1"
           required
         />
-        {errors.name && <p className="text-red-500 text-xs">{errors.name}</p>}
-      </div>
+      </FormField>
 
-      <div>
-        <label className="block text-sm font-medium">Domain / Public Host</label>
+      <FormField label="公网域名" help="可以粘贴完整 URL，保存时会自动规范化为域名和协议。" error={errors.domain}>
         <input
           name="domain"
           value={formData.domain}
           onChange={handleChange}
-          className="w-full border rounded p-1"
           required
         />
-        {errors.domain && <p className="text-red-500 text-xs">{errors.domain}</p>}
-      </div>
+      </FormField>
 
-      <div>
-        <label className="block text-sm font-medium">Protocol</label>
+      <FormField label="访问协议">
         <select
           name="protocol"
           value={formData.protocol}
           onChange={handleChange}
-          className="w-full border rounded p-1"
         >
           <option value="https">HTTPS</option>
           <option value="http">HTTP</option>
           <option value="tcp">TCP</option>
         </select>
-      </div>
+      </FormField>
 
-      <div>
-        <label className="block text-sm font-medium">Target Type</label>
+      <FormField label="目标类型" error={errors.targetType}>
         <select
           name="targetType"
           value={formData.targetType}
           onChange={handleChange}
-          className="w-full border rounded p-1"
         >
-          <option value="server-local">Server Local (Caddy)</option>
-          <option value="desktop-frp">Desktop FRP</option>
-          <option value="cloudflare">Cloudflare Tunnel</option>
+          <option value="server-local">服务器本机（Caddy）</option>
+          <option value="desktop-frp">桌面 FRP</option>
+          <option value="cloudflare">Cloudflare 隧道</option>
         </select>
-        {errors.targetType && <p className="text-red-500 text-xs">{errors.targetType}</p>}
-      </div>
+      </FormField>
 
-      <div>
-        <label className="block text-sm font-medium">Target Tool Instance</label>
+      <FormField label="目标工具实例" error={errors.targetToolInstanceId}>
         <select
           name="targetToolInstanceId"
           value={formData.targetToolInstanceId}
           onChange={handleChange}
-          className="w-full border rounded p-1"
           required
         >
-          <option value="">Select a tool...</option>
+          <option value="">选择工具实例...</option>
           {runtimeInfo.config.toolInstances.map((tool) => (
             <option key={tool.id} value={tool.id}>
               {tool.displayName} ({tool.id})
             </option>
           ))}
         </select>
-        {errors.targetToolInstanceId && <p className="text-red-500 text-xs">{errors.targetToolInstanceId}</p>}
-      </div>
+      </FormField>
 
-      <div>
-        <label className="block text-sm font-medium">Auth Mode</label>
+      <FormField label="认证方式" error={errors.authMode}>
         <select
           name="authMode"
           value={formData.authMode}
           onChange={handleChange}
-          className="w-full border rounded p-1"
         >
-          <option value="opencode-password">OpenCode Password</option>
+          <option value="opencode-password">OpenCode 密码</option>
           <option value="basic-auth">Basic Auth</option>
-          <option value="both">Both</option>
+          <option value="both">双重保护</option>
         </select>
-        {errors.authMode && <p className="text-red-500 text-xs">{errors.authMode}</p>}
-      </div>
+      </FormField>
 
-      <div className="flex justify-end space-x-2">
-        <button type="button" onClick={onCancel} className="px-3 py-1 border rounded">
-          Cancel
-        </button>
-        <button type="submit" className="px-3 py-1 bg-blue-600 text-white rounded">
-          Save
-        </button>
+      <div className="flex justify-end gap-2 border-t border-slate-100 pt-4">
+        <ActionButton onClick={onCancel} tone="secondary">取消</ActionButton>
+        <ActionButton type="submit" tone="primary">保存</ActionButton>
       </div>
     </form>
   )

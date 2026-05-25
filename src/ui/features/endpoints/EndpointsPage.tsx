@@ -6,6 +6,7 @@ import { ErrorState } from "../../components/ErrorState"
 import { formatEndpointPublicAddress } from "../../../core/endpoints/endpoint-service"
 import { EndpointForm } from "./EndpointForm"
 import type { EndpointDiagnostics, EndpointSafetyCheck } from "./use-endpoints-state"
+import { ActionButton, EmptyState, PageHeader, SectionCard, StatusBadge } from "../../components/FomoPrimitives"
 
 export interface EndpointsPageState {
   endpoints: PublicEndpoint[]
@@ -40,8 +41,8 @@ export function EndpointsPage({
 
   if (loading) {
     return (
-      <div className="p-8 flex flex-col items-center justify-center text-gray-500 min-h-32">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mb-2" />
+      <div className="flex min-h-32 flex-col items-center justify-center p-8 text-slate-500">
+        <div className="mb-2 h-8 w-8 animate-spin rounded-full border-b-2 border-blue-600" />
         <span className="animate-pulse">正在加载公网入口...</span>
       </div>
     )
@@ -49,7 +50,7 @@ export function EndpointsPage({
 
   if (error) {
     return (
-      <div role="alert" className="p-4 bg-red-50 text-red-700 rounded border border-red-200">
+      <div role="alert" className="m-8 rounded-xl border border-red-200 bg-red-50 p-4 text-red-700">
         <h2 className="font-bold mb-2">公网入口错误</h2>
         <p>错误：{error}</p>
       </div>
@@ -58,30 +59,31 @@ export function EndpointsPage({
 
   return (
     <div className="space-y-6 p-8">
-      <div className="flex justify-between items-center">
-        <div>
-          <p className="text-sm font-medium text-slate-500">公网地址、路由与验收</p>
-          <h1 className="text-2xl font-semibold text-slate-900">公网入口</h1>
-        </div>
-        <button
-          onClick={() => {
+      <PageHeader
+        eyebrow="公网地址、路由与验收"
+        title="公网入口"
+        description="集中管理 OpenCode 的公网路由、认证策略和启用前安全检查。"
+        action={(
+          <ActionButton
+            tone="primary"
+            onClick={() => {
             setPageError(null)
             setEditingEndpoint({ status: "disabled" })
           }}
-          className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
-        >
-          新建入口
-        </button>
-      </div>
+          >
+            新建入口
+          </ActionButton>
+        )}
+      />
 
       {pageError && (
-        <div role="alert" className="rounded border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+        <div role="alert" className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
           {pageError}
         </div>
       )}
 
       {editingEndpoint && runtimeInfo && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4 backdrop-blur-sm">
           <div className="max-w-lg w-full">
             <EndpointForm
               endpoint={editingEndpoint}
@@ -118,27 +120,24 @@ export function EndpointsPage({
         />
       )}
 
-      <section aria-labelledby="endpoint-list-heading" className="bg-white border rounded-lg overflow-hidden">
-        <h2 id="endpoint-list-heading" className="text-lg font-semibold p-4 bg-gray-50 border-b">入口列表</h2>
-        <table className="min-w-full divide-y divide-gray-200">
-          <thead className="bg-gray-50">
-            <tr>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">名称 / ID</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">地址 / 域名</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">目标</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">状态</th>
-              <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">操作</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-gray-200">
-            {endpoints.length === 0 ? (
-              <tr>
-                <td colSpan={5} className="px-6 py-10 text-center text-gray-500">
-                  还没有配置任何公网入口。
-                </td>
-              </tr>
-            ) : (
-              endpoints.map((endpoint) => {
+      <SectionCard title="入口列表" description="查看每个公网入口的公开地址、目标工具、认证方式和启用状态。">
+        <h2 id="endpoint-list-heading" className="sr-only">入口列表</h2>
+        {endpoints.length === 0 ? (
+          <EmptyState title="还没有配置任何公网入口" description="新建入口后会在这里显示公网地址、安全状态和启停操作。" />
+        ) : (
+          <div className="overflow-hidden rounded-lg border border-slate-200">
+            <table className="min-w-full divide-y divide-slate-200">
+              <thead className="bg-slate-50">
+                <tr>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-slate-500">名称 / ID</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-slate-500">公网域名</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-slate-500">目标</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-slate-500">状态</th>
+                  <th className="px-6 py-3 text-right text-xs font-medium text-slate-500">操作</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-200 bg-white">
+                {endpoints.map((endpoint) => {
                 const safety = checkSafety({ ...endpoint, status: "active" })
                 const enableStatus = getActionStatus?.(`enable-endpoint-${endpoint.id}`) ?? "idle"
                 const disableStatus = getActionStatus?.(`disable-endpoint-${endpoint.id}`) ?? "idle"
@@ -149,43 +148,37 @@ export function EndpointsPage({
                 return (
                   <tr key={endpoint.id} className="transition-colors hover:bg-slate-50/50">
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm font-medium text-gray-900">{endpoint.name}</div>
-                      <div className="text-xs text-gray-500">{endpoint.id}</div>
+                      <div className="text-sm font-medium text-slate-900">{endpoint.name}</div>
+                      <div className="font-mono text-xs text-slate-500">{endpoint.id}</div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm text-gray-900">
+                      <div className="text-sm text-slate-900">
                         {formatEndpointPublicAddress(endpoint)}
                       </div>
-                      <div className="text-xs text-gray-500">{endpoint.authMode}</div>
+                      <div className="text-xs text-slate-500">
+                        {formatAuthModeLabel(endpoint.authMode)} · <span className="font-mono">{endpoint.authMode}</span>
+                      </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm text-gray-900">{endpoint.targetType}</div>
-                      <div className="text-xs text-gray-500">{endpoint.targetToolInstanceId}</div>
+                      <div className="text-sm text-slate-900">{formatTargetTypeLabel(endpoint.targetType)}</div>
+                      <div className="font-mono text-xs text-slate-500">{endpoint.targetType} · {endpoint.targetToolInstanceId}</div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <span
-                        className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
-                          endpoint.status === "active"
-                            ? "bg-green-100 text-green-800"
-                            : endpoint.status === "error"
-                            ? "bg-red-100 text-red-800"
-                            : "bg-gray-100 text-gray-800"
-                        }`}
-                      >
-                          {statusLabel}
-                      </span>
+                      <StatusBadge tone={getEndpointStatusTone(endpoint.status)}>{statusLabel}</StatusBadge>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium space-x-2">
+                    <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                      <div className="flex items-center justify-end gap-2">
                       <AsyncActionStatus status={enableStatus === "idle" ? disableStatus : enableStatus} />
-                      <button
+                      <ActionButton
                         onClick={() => setEditingEndpoint(endpoint)}
                         disabled={actionPending}
-                        className="text-blue-600 hover:text-blue-900"
+                        tone="secondary"
+                        className="px-3 py-1.5"
                       >
                         编辑
-                      </button>
+                      </ActionButton>
                       {endpoint.status === "active" ? (
-                        <button
+                        <ActionButton
                           onClick={async () => {
                             if (window.confirm("确认停用这个公网入口并保留当前配置吗？")) {
                               try {
@@ -197,24 +190,25 @@ export function EndpointsPage({
                             }
                           }}
                           disabled={actionPending}
-                          className="text-red-600 hover:text-red-900"
+                          tone="danger"
+                          className="px-3 py-1.5"
                         >
                           停用
-                        </button>
+                        </ActionButton>
                       ) : (
-                        <button
-                          onClick={async () => {
+                        <ActionButton
+                          onClick={() => {
                             setSecurityCheckEndpoint(endpoint)
                           }}
                           disabled={actionPending}
                           title={safety.suggestion}
-                          className={`${
-                            safety.ok ? "text-green-600 hover:text-green-900" : "text-gray-400 cursor-not-allowed"
-                          }`}
+                          tone={safety.ok ? "success" : "secondary"}
+                          className="px-3 py-1.5"
                         >
                           启用
-                        </button>
+                        </ActionButton>
                       )}
+                      </div>
                       {(enableError || disableError) && (
                         <div className="mt-2 text-left">
                           {enableError && <ErrorState error={enableError} onRetry={() => void enableEndpoint(endpoint.id)} />}
@@ -224,19 +218,19 @@ export function EndpointsPage({
                     </td>
                   </tr>
                 )
-              })
-            )}
-          </tbody>
-        </table>
-      </section>
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </SectionCard>
 
-      <section aria-labelledby="endpoint-editor-heading" className="bg-white p-4 rounded shadow border">
-        <h2 id="endpoint-editor-heading" className="text-lg font-semibold mb-3">创建 / 编辑入口</h2>
-        <p className="text-sm text-gray-600">通过“新建入口”或“编辑”管理入口名称、公开地址、协议、目标类型、目标实例和认证模式。新入口在安全检查通过前会保持为停用状态。</p>
-      </section>
+      <SectionCard title="创建 / 编辑入口" description="通过“新建入口”或“编辑”管理入口名称、公开地址、协议、目标类型、目标实例和认证模式。新入口在安全检查通过前会保持为停用状态。">
+        <h2 id="endpoint-editor-heading" className="sr-only">创建 / 编辑入口</h2>
+      </SectionCard>
 
-      <section aria-labelledby="endpoint-validation-heading" className="bg-white p-4 rounded shadow border">
-        <h2 id="endpoint-validation-heading" className="text-lg font-semibold mb-3">入口校验</h2>
+      <SectionCard title="入口校验" description="启用前持续展示每个入口的安全检查结果。">
+        <h2 id="endpoint-validation-heading" className="sr-only">入口校验</h2>
         <ul className="space-y-2 text-sm text-slate-600">
           {endpoints.length === 0 ? (
             <li>当前没有入口，因此暂无校验问题。</li>
@@ -249,32 +243,34 @@ export function EndpointsPage({
             )
           })}
         </ul>
-      </section>
+      </SectionCard>
 
-      <section aria-labelledby="endpoint-enable-heading" className="bg-white p-4 rounded shadow border">
-        <h2 id="endpoint-enable-heading" className="text-lg font-semibold mb-3">启用条件</h2>
-        <p className="text-sm text-gray-600">只有在 OpenCode 正常运行、认证已配置、提供方可用、目标端口已知且不存在冲突的已启用入口时，才允许启用。</p>
-      </section>
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+        <SectionCard title="启用条件">
+          <h2 id="endpoint-enable-heading" className="sr-only">启用条件</h2>
+          <p className="text-sm text-slate-600">只有在 OpenCode 正常运行、认证已配置、提供方可用、目标端口已知且不存在冲突的已启用入口时，才允许启用。</p>
+        </SectionCard>
 
-      <section aria-labelledby="endpoint-disable-heading" className="bg-white p-4 rounded shadow border">
-        <h2 id="endpoint-disable-heading" className="text-lg font-semibold mb-3">停用行为</h2>
-        <p className="text-sm text-gray-600">停用需要确认，但会保留当前入口配置，方便后续再次启用。</p>
-      </section>
+        <SectionCard title="停用行为">
+          <h2 id="endpoint-disable-heading" className="sr-only">停用行为</h2>
+          <p className="text-sm text-slate-600">停用需要确认，但会保留当前入口配置，方便后续再次启用。</p>
+        </SectionCard>
+      </div>
 
-      <section aria-labelledby="diagnostics-heading" className="space-y-4">
-        <h2 id="diagnostics-heading" className="text-xl font-semibold">诊断信息</h2>
+      <SectionCard title="诊断信息" description="按入口查看目标运行状态、端口、提供方可用性和修复建议。">
+        <h2 id="diagnostics-heading" className="sr-only">诊断信息</h2>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {endpoints.map((endpoint) => {
             const diagnostics = getDiagnostics?.(endpoint) ?? createFallbackDiagnostics(endpoint, runtimeInfo, checkSafety)
             const targetTool = runtimeInfo?.config.toolInstances.find((t) => t.id === endpoint.targetToolInstanceId)
 
             return (
-              <div key={`diag-${endpoint.id}`} className="border rounded-lg p-4 bg-gray-50 space-y-2">
-                <h3 className="font-medium text-gray-900">{endpoint.name}</h3>
+              <div key={`diag-${endpoint.id}`} className="space-y-3 rounded-lg border border-slate-200 bg-slate-50 p-4">
+                <h3 className="font-medium text-slate-900">{endpoint.name}</h3>
                 <ul className="text-sm space-y-1">
                   <li className="flex justify-between">
                     <span>目标运行状态：</span>
-                    <span className={diagnostics.targetRunning ? "text-green-600" : "text-red-600"}>
+                    <span className={diagnostics.targetRunning ? "text-emerald-600" : "text-red-600"}>
                       {targetTool?.status || "unknown"}
                     </span>
                   </li>
@@ -284,25 +280,25 @@ export function EndpointsPage({
                   </li>
                   <li className="flex justify-between">
                     <span>FRP / Cloudflare：</span>
-                    <span className={diagnostics.providerAvailable ? "text-green-600" : "text-red-600"}>
+                    <span className={diagnostics.providerAvailable ? "text-emerald-600" : "text-red-600"}>
                       {diagnostics.providerAvailable ? "可用" : "不可用"}
                     </span>
                   </li>
                   <li className="flex justify-between">
                     <span>认证完整性：</span>
-                    <span className={diagnostics.authComplete ? "text-green-600" : "text-red-600"}>
+                    <span className={diagnostics.authComplete ? "text-emerald-600" : "text-red-600"}>
                       {diagnostics.authComplete ? "完整" : "不完整"}
                     </span>
                   </li>
                   <li className="flex justify-between">
                     <span>安全检查：</span>
-                    <span className={diagnostics.fixSuggestion === "Endpoint is ready to enable." ? "text-green-600" : "text-red-600"}>
+                    <span className={diagnostics.fixSuggestion === "Endpoint is ready to enable." ? "text-emerald-600" : "text-red-600"}>
                       {diagnostics.fixSuggestion === "Endpoint is ready to enable." ? "通过" : "未通过"}
                     </span>
                   </li>
                   {diagnostics.recentError && <li className="text-xs text-amber-700">最近错误：{diagnostics.recentError}</li>}
                   {diagnostics.fixSuggestion !== "Endpoint is ready to enable." && (
-                    <li className="text-xs text-red-500 bg-red-50 p-1 rounded">
+                    <li className="rounded border border-red-100 bg-red-50 p-2 text-xs text-red-600">
                       <strong>修复建议：</strong> {diagnostics.fixSuggestion}
                     </li>
                   )}
@@ -311,7 +307,7 @@ export function EndpointsPage({
             )
           })}
         </div>
-      </section>
+      </SectionCard>
     </div>
   )
 }
@@ -339,6 +335,28 @@ function getErrorMessage(error: unknown): string {
   if (error instanceof Error) return error.message
   if (typeof error === "string") return error
   return "公网入口操作失败。"
+}
+
+function getEndpointStatusTone(status: PublicEndpoint["status"]) {
+  if (status === "active") return "success"
+  if (status === "error") return "danger"
+  return "neutral"
+}
+
+function formatAuthModeLabel(authMode: PublicEndpoint["authMode"]): string {
+  return {
+    "opencode-password": "OpenCode 密码",
+    "basic-auth": "Basic Auth",
+    both: "双重保护",
+  }[authMode]
+}
+
+function formatTargetTypeLabel(targetType: PublicEndpoint["targetType"]): string {
+  return {
+    "server-local": "服务器本机",
+    "desktop-frp": "桌面 FRP",
+    cloudflare: "Cloudflare 隧道",
+  }[targetType]
 }
 
 function EndpointSecurityModal({ endpoint, safety, onClose, onConfirm }: { endpoint: PublicEndpoint; safety: EndpointSafetyCheck; onClose: () => void; onConfirm: () => Promise<void> }) {

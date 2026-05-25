@@ -104,7 +104,7 @@ function setNativeValue(input: HTMLInputElement | HTMLSelectElement, value: stri
 }
 
 function submit(container: HTMLElement): void {
-  const button = Array.from(container.querySelectorAll("button")).find((item) => item.textContent === "Save")
+  const button = Array.from(container.querySelectorAll("button")).find((item) => item.textContent === "保存")
   if (!(button instanceof HTMLButtonElement)) throw new Error("Save button not found")
   act(() => button.click())
 }
@@ -115,6 +115,15 @@ describe("EndpointForm", () => {
 
     expect((container.querySelector('input[name="name"]') as HTMLInputElement | null)?.value).toBe("Test Endpoint")
     expect((container.querySelector('input[name="domain"]') as HTMLInputElement | null)?.value).toBe("test.example.com")
+    expect(container.textContent).toContain("入口名称")
+    expect(container.textContent).toContain("公网域名")
+    expect(container.textContent).toContain("目标类型")
+    expect(container.textContent).toContain("认证方式")
+    expect(container.textContent).toContain("保存")
+    expect(container.textContent).toContain("取消")
+    expect(container.textContent).not.toContain("Domain / Public Host")
+    expect(container.innerHTML).toContain("rounded-md border border-slate-300 px-3 py-2 text-sm shadow-sm")
+    expect(container.innerHTML).not.toContain("w-full border rounded p-1")
   })
 
   it("creates new endpoints in disabled state by default", () => {
