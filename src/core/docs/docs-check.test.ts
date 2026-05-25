@@ -22,6 +22,36 @@ describe("management UI docs", () => {
   })
 })
 
+describe("server deployment auth boundary", () => {
+  it("injects the management API session token at the trusted reverse proxy boundary", () => {
+    const caddyfile = readFileSync("deploy/server/Caddyfile", "utf8")
+    const healthcheck = readFileSync("deploy/server/healthcheck.sh", "utf8")
+
+    expect(caddyfile).toContain("@desktopTunnelDeviceApi path /api/desktop-tunnels/provision /api/desktop-tunnels/heartbeat")
+    expect(caddyfile.indexOf("handle @desktopTunnelDeviceApi")).toBeLessThan(caddyfile.indexOf("basic_auth /*"))
+    expect(caddyfile).toContain('header_up Authorization "Bearer {$MANAGEMENT_API_SESSION_TOKEN}"')
+    expect(healthcheck).toContain('MANAGEMENT_API_SESSION_TOKEN')
+    expect(healthcheck).toContain("authorization")
+    expect(healthcheck).toContain("process.env.MANAGEMENT_API_SESSION_TOKEN")
+    expect(healthcheck).not.toContain("Bearer ${MANAGEMENT_API_SESSION_TOKEN}")
+
+    const hostCurlLines = healthcheck
+      .split("\n")
+      .filter((line) => line.trimStart().startsWith("curl "))
+
+    expect(hostCurlLines.length).toBeGreaterThanOrEqual(3)
+    expect(healthcheck).toContain("mktemp")
+    expect(healthcheck).toContain("chmod 600 \"$CURL_BASIC_AUTH_CONFIG\"")
+    expect(healthcheck).toContain("--config \"$CURL_BASIC_AUTH_CONFIG\"")
+
+    for (const curlLine of hostCurlLines) {
+      expect(curlLine).not.toContain("-u ")
+      expect(curlLine).not.toContain("--user")
+      expect(curlLine).not.toContain("OPENCODE_SERVER_PASSWORD")
+    }
+  })
+})
+
 describe("CLI naming docs", () => {
   it("keeps README validation commands on package scripts and the real bin entry", () => {
     const readme = readFileSync("README.md", "utf8")
