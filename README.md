@@ -53,6 +53,10 @@ bun run cli -- cloudflare-tunnel --mode named --hostname opencode.example.com --
 
 快速模式会输出 `cloudflared tunnel --url http://127.0.0.1:4096` 命令，并由 Cloudflare 生成临时访问地址。命名隧道模式会输出登录、创建隧道、配置 DNS 路由和启动隧道的命令。
 
+### Desktop auto FRP tunnel
+
+The desktop Phase 1 flow is client-initiated. Configure the server FRP panel settings and a desktop device token, then start the Tauri desktop app. The desktop app starts or reuses local OpenCode on `127.0.0.1:4096`, requests a server-provisioned FRP route, writes `frpc.toml`, starts `frpc`, and reports heartbeat status. The server UI shows the device under `远程设备` with the assigned public URL. Any network-reachable or production server must configure both the management session/admin token and the desktop device token; desktop provision/heartbeat routes fail closed when no device token is configured.
+
 ## CLI
 
 本项目的 CLI 是 `opencode-remote` / `opencode-remote-platform`。源码入口是 `src/cli-program.ts`，发布入口是 `bin/opencode-remote.js`，不要使用历史文档中的 `src/cli/` 旧入口。

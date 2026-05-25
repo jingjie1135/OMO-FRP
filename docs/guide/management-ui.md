@@ -20,6 +20,14 @@ OpenCode 远程平台的管理界面采用同一套 React 管理界面，同时�
 - **FRP 服务端**：初始化 frp-panel，配置 frps/Caddy，管理 token/secret，查看客户端列表，生成桌面端连接配置。
 - **FRP 客户端**：填写服务器地址和 token，选择本机 OpenCode 端口，生成 frpc 配置，启动/停止 frpc，并显示公网 URL。
 
+## 桌面端自动 FRP 隧道
+
+Phase 1 支持桌面端主动申请 FRP 隧道：桌面端启动或复用本机 OpenCode（仅监听 `127.0.0.1`），向服务器申请 `frp-panel` client/proxy，写入 `frpc.toml`，启动 `frpc`，并通过 heartbeat 上报 OpenCode、frpc、隧道和公网 URL 状态。
+
+服务器管理界面新增 `远程设备` 页面，展示设备在线/离线/错误状态、公网 URL、诊断和删除设备记录操作。服务器不会远程执行桌面命令；第一期只接收桌面端主动请求。
+
+安全边界：OpenCode 必须配置 `OPENCODE_SERVER_PASSWORD`，device token 用于桌面端 provision/heartbeat；面向网络或生产部署的服务器还必须配置管理 session/admin token，不能依赖本地测试模式下的空 session token。未配置 device token 时，桌面端 provision/heartbeat 路由会 fail closed 返回 401。FRP token/client secret/OpenCode password 不在 UI 明文展示，普通诊断输出会脱敏。
+
 ## 多 endpoint 模型
 
 公网入口统一使用 `PublicEndpoint` 描述。一个服务器可以同时管理多个 endpoint，例如：
