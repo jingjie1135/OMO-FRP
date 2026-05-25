@@ -194,14 +194,15 @@ export function buildServerDeployPlan(options: Partial<ServerDeployOptions>): Se
     frpPanelImage,
     managesOpenCodeByDefault: false,
     requiredSecrets: [
+      "OPENCODE_SERVER_PASSWORD",
       "OPENCODE_REMOTE_BASIC_AUTH_PASSWORD_HASH",
       "FRP_PANEL_APP_GLOBAL_SECRET",
     ],
     commands: [
       `install -d -m 0750 ${installRoot}`,
-      `cp .env.example ${installRoot}/.env`,
-      `cp docker-compose.yml Caddyfile healthcheck.sh ${installRoot}/`,
-      `docker compose --env-file ${installRoot}/.env -f ${installRoot}/docker-compose.yml up -d frp-panel caddy`,
+      `cp deploy/server/.env.example ${installRoot}/.env`,
+      `editor ${installRoot}/.env`,
+      `OPENCODE_REMOTE_INSTALL_ROOT=${installRoot} deploy/server/install.sh`,
       `${installRoot}/healthcheck.sh`,
     ],
     explicitToolActions: [
@@ -231,3 +232,4 @@ export const SERVER_DEPLOY_DEFAULTS = {
   DEFAULT_FRP_PANEL_RPC_PORT,
   DEFAULT_INSTALL_ROOT,
 } as const
+

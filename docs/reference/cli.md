@@ -59,6 +59,12 @@ opencode-remote server-deploy-plan --domain opencode.example.com --email admin@e
 
 该规划会包含 `/opt/opencode-remote-platform` 路径、必需密钥名称、OpenCode 公网地址、frp-panel API/RPC 地址和服务器命令。服务器命令默认只部署 FRP server、公共路由和受保护入口；OpenCode 检测、`oh-my-openagent` 插件安装和 OpenCode 启动会以 `explicitToolActions` 单独输出，必须由 UI/CLI 显式触发。
 
+默认命令序列会要求：
+
+- 先复制 `deploy/server/.env.example` 到目标安装目录
+- 先编辑 `.env` 写入 `OPENCODE_SERVER_PASSWORD`、Basic Auth 哈希和 frp-panel 密钥
+- 再执行 `OPENCODE_REMOTE_INSTALL_ROOT=<path> deploy/server/install.sh`
+
 ## remote-access
 
 ```bash
