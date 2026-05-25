@@ -802,5 +802,3 @@ Expected: only intended desktop auto FRP tunnel files are changed in the feature
 - [ ] **Step 7: Post Multica issue update**
 
 Post a concise HUA-49 comment with plan path, implementation summary, verification commands and outcomes, manual QA result, and explicit limitation that real public FRP/DNS connectivity was not verified if no real FRP panel was available. Do not include agent mention links.
-
-
