@@ -249,7 +249,10 @@ function createFakeClient(initialStatus: CloudflareTunnelStatus = quickStatus, i
     async stopFrp() {
       return successJob
     },
-    async getCloudflareTunnelStatus() {
+    async listDesktopTunnelDevices() { return [] },
+    async provisionDesktopTunnel() { throw new Error("Desktop tunnel provisioning is not configured for this test client") },
+    async sendDesktopTunnelHeartbeat() { throw new Error("Desktop tunnel heartbeat is not configured for this test client") },
+    async deleteDesktopTunnelDevice() {},    async getCloudflareTunnelStatus() {
       calls.getCloudflareTunnelStatus += 1
       return status
     },
