@@ -17,6 +17,7 @@ export function bootManagementUi(options: BootManagementUiOptions = {}): void {
   }
 
   const client = options.createClient?.() ?? createBrowserManagementClient()
+  startDesktopAutoTunnelIfAvailable(client)
 
   createRoot(rootElement).render(
     <StrictMode>
@@ -25,6 +26,16 @@ export function bootManagementUi(options: BootManagementUiOptions = {}): void {
   )
 }
 
+function startDesktopAutoTunnelIfAvailable(client: ManagementClient): void {
+  const startup = (client as ManagementClient & { startDesktopAutoTunnel?: () => Promise<unknown> }).startDesktopAutoTunnel
+  if (!startup) {
+    return
+  }
+
+  void startup().catch((error: unknown) => {
+    console.error(redactSensitiveText(error instanceof Error ? error.message : String(error)))
+  })
+}
 try {
   bootManagementUi()
 } catch (error: unknown) {
