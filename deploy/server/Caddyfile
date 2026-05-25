@@ -1,8 +1,17 @@
 {$OPENCODE_REMOTE_DOMAIN} {
-  basic_auth /* {
-    {$OPENCODE_REMOTE_BASIC_AUTH_USER} {$OPENCODE_REMOTE_BASIC_AUTH_PASSWORD_HASH}
+  @desktopTunnelDeviceApi path /api/desktop-tunnels/provision /api/desktop-tunnels/heartbeat
+  handle @desktopTunnelDeviceApi {
+    reverse_proxy management-ui:{$MANAGEMENT_UI_PORT}
   }
-  reverse_proxy management-ui:{$MANAGEMENT_UI_PORT}
+
+  handle {
+    basic_auth /* {
+      {$OPENCODE_REMOTE_BASIC_AUTH_USER} {$OPENCODE_REMOTE_BASIC_AUTH_PASSWORD_HASH}
+    }
+    reverse_proxy management-ui:{$MANAGEMENT_UI_PORT} {
+      header_up Authorization "Bearer {$MANAGEMENT_API_SESSION_TOKEN}"
+    }
+  }
 }
 
 opencode.{$OPENCODE_REMOTE_DOMAIN} {
