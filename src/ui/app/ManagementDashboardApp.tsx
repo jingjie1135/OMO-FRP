@@ -1,11 +1,12 @@
 import { useEffect, useState } from "react"
-import { Globe, LayoutDashboard, RefreshCw, Server, Settings, Shield, TerminalSquare, Wrench } from "lucide-react"
+import { Globe, LayoutDashboard, Monitor, RefreshCw, Server, Settings, Shield, TerminalSquare, Wrench } from "lucide-react"
 import type { ManagementClient } from "../../management-api/client"
 import type { ConfigBackup, ConfigDocument, ConfigPreset, ConfigTarget, RuntimeInfo } from "../../management-api/types"
 import { redactSensitiveText } from "../../shared/redact-sensitive-text"
 import { CloudflareTunnelPageWrapper } from "../features/cloudflare/CloudflareTunnelPageWrapper"
 import { ConfigPage } from "../features/config/ConfigPage"
 import { DashboardView } from "../features/dashboard/DashboardView"
+import { DesktopTunnelsPageWrapper } from "../features/desktop-tunnels/DesktopTunnelsPageWrapper"
 import { type DashboardState, useDashboardState } from "../features/dashboard/use-dashboard-state"
 import { EndpointsPageWrapper } from "../features/endpoints/EndpointsPageWrapper"
 import { FrpPageWrapper } from "../features/frp/FrpPageWrapper"
@@ -25,11 +26,12 @@ const navigationItems: NavigationItem[] = [
   { id: "endpoints", label: "公网入口", icon: Globe },
   { id: "config", label: "配置与备份", icon: Settings },
   { id: "frp", label: "FRP 穿透", icon: Shield },
+  { id: "desktop-tunnels", label: "远程设备", icon: Monitor },
   { id: "cloudflare", label: "Cloudflare 隧道", icon: Globe, requiresCloudflareTunnel: true },
   { id: "logs", label: "日志", icon: TerminalSquare },
 ]
 
-type ManagementPageId = "dashboard" | "tools" | "endpoints" | "config" | "frp" | "cloudflare" | "logs"
+type ManagementPageId = "dashboard" | "tools" | "endpoints" | "config" | "frp" | "desktop-tunnels" | "cloudflare" | "logs"
 
 export function ManagementDashboardApp({ client }: { client: ManagementClient }) {
   const dashboardState = useDashboardState(client)
@@ -132,6 +134,8 @@ function renderActivePage(activePage: ManagementPageId, client: ManagementClient
       return <ConfigPageShell client={client} runtimeInfo={dashboard.runtimeInfo} />
     case "frp":
       return <FrpPageWrapper client={client} initialRuntimeInfo={dashboard.runtimeInfo} initialStatus={dashboard.frpStatus} initialEndpoints={dashboard.runtimeInfo.config.publicEndpoints} />
+    case "desktop-tunnels":
+      return <DesktopTunnelsPageWrapper client={client} />
     case "cloudflare":
       return <CloudflareTunnelPageWrapper client={client} initialRuntimeInfo={dashboard.runtimeInfo} />
     case "logs":

@@ -29,6 +29,8 @@ describe("management UI acceptance", () => {
     expect(serverHtml).toContain("FOMO")
     expect(serverHtml).toContain("服务器模式")
     expect(serverHtml).toContain("Cloudflare 隧道")
+    expect(serverHtml).toContain("远程设备")
+    expect(serverHtml).toContain("Alice Laptop")
     expect(serverHtml).toContain("dashboard:server")
     expect(serverHtml).toContain('data-frp-panel="server"')
     expect(serverHtml).toContain('data-settings-mode="server"')
@@ -40,6 +42,7 @@ describe("management UI acceptance", () => {
     expect(desktopHtml).toContain('data-frp-panel="client"')
     expect(desktopHtml).toContain('data-settings-mode="desktop"')
 
+    expect(serverCalls).toContain("listDesktopTunnelDevices")
     expect(serverCalls).toContain("createCloudflareTunnelPlan")
     expect(desktopCalls).toContain("createCloudflareTunnelPlan")
   })
@@ -232,7 +235,13 @@ function createAcceptanceClient(runtimeInfo: RuntimeInfo, calls: string[]): Mana
     async saveFrpConfig() {},
     async startFrp() { return successJob },
     async stopFrp() { return successJob },
-    async getCloudflareTunnelStatus() {
+    async listDesktopTunnelDevices() {
+      calls.push("listDesktopTunnelDevices")
+      return [{ id: "desktop-alice", name: "Alice Laptop", status: "online", opencodeStatus: "running", tunnelStatus: "connected", frpcStatus: "running", publicUrl: "https://alice.frp.example.com", localHost: "127.0.0.1", localPort: 4096, proxyName: "opencode-alice", subdomain: "alice", lastSeenAt: "2026-05-25T00:00:00.000Z" }]
+    },
+    async provisionDesktopTunnel() { throw new Error("Desktop tunnel provisioning is not configured for this test client") },
+    async sendDesktopTunnelHeartbeat() { throw new Error("Desktop tunnel heartbeat is not configured for this test client") },
+    async deleteDesktopTunnelDevice() {},    async getCloudflareTunnelStatus() {
       calls.push("getCloudflareTunnelStatus")
       return { mode: "quick", running: false, message: "Cloudflare Tunnel stopped." }
     },

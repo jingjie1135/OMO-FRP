@@ -41,6 +41,8 @@ import type {
 import type { StorageAdapter } from "../core/storage/storage-adapter"
 import { MemoryStorage } from "../core/storage/memory-storage"
 import { redactSensitiveText } from "../shared/redact-sensitive-text"
+import { createDesktopTunnelDeviceStore } from "../core/desktop-tunnel/device-store"
+import { createDesktopTunnelProvisioningService, type DesktopTunnelProvisioningServiceOptions } from "../core/desktop-tunnel/provisioning-service"
 
 export interface CreateLocalManagementRuntimeOptions {
   capabilities: RuntimeCapabilities
@@ -49,6 +51,7 @@ export interface CreateLocalManagementRuntimeOptions {
   config?: AppConfig
   storage?: StorageAdapter
   now?: () => Date
+  desktopTunnelProvisioning?: DesktopTunnelProvisioningServiceOptions
 }
 
 interface LocalManagementState {
@@ -63,6 +66,8 @@ interface LocalManagementState {
 export function createLocalManagementRuntime(options: CreateLocalManagementRuntimeOptions): SettingsManagementClient {
   const storage = options.storage ?? new MemoryStorage()
   const now = options.now ?? (() => new Date())
+  const desktopTunnelStore = createDesktopTunnelDeviceStore({ now })
+  const desktopTunnelProvisioning = options.desktopTunnelProvisioning ? createDesktopTunnelProvisioningService(options.desktopTunnelProvisioning) : undefined
   const state: LocalManagementState = {
     config: cloneValue(options.config ?? createEmptyConfig(options.capabilities.mode)),
     frpRunning: false,
@@ -340,6 +345,35 @@ export function createLocalManagementRuntime(options: CreateLocalManagementRunti
       )
     },
 
+
+    async listDesktopTunnelDevices() {
+      return desktopTunnelStore.listDevices()
+    },
+
+    async provisionDesktopTunnel(request) {
+      if (!desktopTunnelProvisioning) {
+        throw new Error("Desktop tunnel provisioning is not configured on this server.")
+      }
+      const response = await desktopTunnelProvisioning.provision(request)
+      desktopTunnelStore.recordProvision({
+        deviceId: request.deviceId,
+        deviceName: request.deviceName,
+        localHost: request.localHost,
+        localPort: request.localPort,
+        proxyName: response.proxyName,
+        subdomain: response.subdomain,
+        publicUrl: response.publicUrl,
+      })
+      return response
+    },
+
+    async sendDesktopTunnelHeartbeat(request) {
+      return desktopTunnelStore.recordHeartbeat(request)
+    },
+
+    async deleteDesktopTunnelDevice(deviceId) {
+      desktopTunnelStore.deleteDevice(deviceId)
+    },
     async getCloudflareTunnelStatus(): Promise<CloudflareTunnelStatus> {
       const config = state.cloudflareConfig ?? createDefaultCloudflareConfig(state.config)
       return {

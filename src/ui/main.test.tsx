@@ -9,6 +9,27 @@ afterEach(() => {
 })
 
 describe("bootManagementUi", () => {
+  it("starts the desktop auto tunnel when the Tauri client exposes the startup command", async () => {
+    const root = document.createElement("div")
+    root.id = "root"
+    document.body.append(root)
+    let startCalls = 0
+    const client = {
+      ...createNoopClient(),
+      async startDesktopAutoTunnel() {
+        startCalls++
+        return { deviceId: "desktop-alice", deviceName: "Alice Laptop", opencodeStatus: "running" as const, tunnelStatus: "connected" as const, frpcStatus: "running" as const, publicUrl: "https://alice.frp.example.com", localPort: 4096 }
+      },
+    }
+
+    await act(async () => {
+      bootManagementUi({ createClient: () => client })
+    })
+    await act(async () => {})
+
+    expect(startCalls).toBe(1)
+  })
+
   it("renders the real app entry with a redacted ManagementClient failure", async () => {
     const root = document.createElement("div")
     root.id = "root"
@@ -82,7 +103,10 @@ function createNoopClient(): ManagementClient {
     async saveFrpConfig() {},
     async startFrp() { return job },
     async stopFrp() { return job },
-    async getCloudflareTunnelStatus() { return { mode: "quick", running: false, message: "Cloudflare Tunnel stopped" } },
+    async listDesktopTunnelDevices() { return [] },
+    async provisionDesktopTunnel() { throw new Error("Desktop tunnel provisioning is not configured for this test client") },
+    async sendDesktopTunnelHeartbeat() { throw new Error("Desktop tunnel heartbeat is not configured for this test client") },
+    async deleteDesktopTunnelDevice() {},    async getCloudflareTunnelStatus() { return { mode: "quick", running: false, message: "Cloudflare Tunnel stopped" } },
     async saveCloudflareTunnelConfig() {},
     async createCloudflareTunnelPlan() { return { mode: "quick", localUrl: "http://127.0.0.1:4096", commandSummary: [], cloudflaredDetected: false, diagnostics: [], securityNotes: [], steps: [] } },
     async startCloudflareTunnel() { return job },

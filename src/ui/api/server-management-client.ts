@@ -1,10 +1,11 @@
 import type { SettingsManagementClient } from "../../management-api/client"
-import type { CloudflareTunnelConfigRequest, CloudflareTunnelStepId, ConfigTarget, FrpConfigRequest, InstallToolRequest } from "../../management-api/types"
+import type { CloudflareTunnelConfigRequest, CloudflareTunnelStepId, ConfigTarget, DesktopTunnelHeartbeatRequest, DesktopTunnelProvisionRequest, FrpConfigRequest, InstallToolRequest } from "../../management-api/types"
 
 export interface ServerManagementClientOptions {
   baseUrl: string
   fetch: (input: string, init?: RequestInit) => Promise<Response>
   sessionToken?: string
+  deviceToken?: string
 }
 
 export function createServerManagementClient(options: ServerManagementClientOptions): SettingsManagementClient {
@@ -78,6 +79,18 @@ export function createServerManagementClient(options: ServerManagementClientOpti
     stopFrp() {
       return postJson(options, "/api/frp/stop")
     },
+    listDesktopTunnelDevices() {
+      return getJson(options, "/api/desktop-tunnels/devices")
+    },
+    provisionDesktopTunnel(request: DesktopTunnelProvisionRequest) {
+      return postDeviceJson(options, "/api/desktop-tunnels/provision", request)
+    },
+    sendDesktopTunnelHeartbeat(request: DesktopTunnelHeartbeatRequest) {
+      return postDeviceJson(options, "/api/desktop-tunnels/heartbeat", request)
+    },
+    deleteDesktopTunnelDevice(deviceId: string) {
+      return deleteVoid(options, `/api/desktop-tunnels/${deviceId}`)
+    },
     getCloudflareTunnelStatus() {
       return getJson(options, "/api/cloudflare-tunnel/status")
     },
@@ -135,8 +148,36 @@ async function postJson<T>(options: ServerManagementClientOptions, path: string,
   return response.json() as Promise<T>
 }
 
+async function postDeviceJson<T>(options: ServerManagementClientOptions, path: string, body?: unknown): Promise<T> {
+  const response = await options.fetch(`${options.baseUrl}${path}`, {
+    method: "POST",
+    headers: createDeviceHeaders(options, { "content-type": "application/json" }),
+    body: body === undefined ? undefined : JSON.stringify(body),
+  })
+  if (!response.ok) {
+    throw new Error(`Management API request failed: ${response.status} ${path}`)
+  }
+  return response.json() as Promise<T>
+}
 async function postVoid(options: ServerManagementClientOptions, path: string, body?: unknown): Promise<void> {
   await postJson<unknown>(options, path, body)
+}
+
+async function deleteVoid(options: ServerManagementClientOptions, path: string): Promise<void> {
+  const response = await options.fetch(`${options.baseUrl}${path}`, {
+    method: "DELETE",
+    headers: createHeaders(options),
+  })
+  if (!response.ok) {
+    throw new Error(`Management API request failed: ${response.status} ${path}`)
+  }
+}
+function createDeviceHeaders(options: ServerManagementClientOptions, headers: Record<string, string> = {}): HeadersInit {
+  if (!options.deviceToken) {
+    return headers
+  }
+
+  return { ...headers, authorization: `Bearer ${options.deviceToken}` }
 }
 
 function createHeaders(options: ServerManagementClientOptions, headers: Record<string, string> = {}): HeadersInit {

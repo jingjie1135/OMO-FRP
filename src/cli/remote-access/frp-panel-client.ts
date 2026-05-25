@@ -1,5 +1,5 @@
 import type { FrpFailureReason, FrpPanelClientResource, FrpPanelProxyResource } from "../../management-api/types"
-import type { NormalizedRemoteAccessOptions, RemoteAccessJoinCommand } from "./types"
+import type { FrpRouteProvisioningOptions, RemoteAccessJoinCommand } from "./types"
 import { buildPublicUrl } from "./public-url"
 
 const API_PREFIX = "/api/v1"
@@ -54,6 +54,7 @@ interface FrpPanelProvisionResult {
   status: "idle" | "provisioning" | "ready" | "error"
   failureReason?: FrpFailureReason
   suggestion?: string
+  clientSecret?: string
   client?: FrpPanelClientResource
   proxy?: FrpPanelProxyResource
   joinCommand?: RemoteAccessJoinCommand
@@ -98,11 +99,11 @@ function encodeConfigBytes(value: unknown): string {
   return Buffer.from(JSON.stringify(value), "utf8").toString("base64")
 }
 
-function buildDesiredProxyConfig(options: NormalizedRemoteAccessOptions): Record<string, unknown> {
+function buildDesiredProxyConfig(options: FrpRouteProvisioningOptions): Record<string, unknown> {
   const config: Record<string, unknown> = {
     name: options.proxyName,
     type: options.proxyType,
-    localIP: "127.0.0.1",
+    localIP: options.localHost,
     localPort: options.localPort,
   }
 
@@ -133,7 +134,7 @@ function configsEqual(existingConfig: string | undefined, desiredConfig: Record<
   }
 }
 
-function buildJoinCommand(options: NormalizedRemoteAccessOptions, client: FrpPanelClientRecord): RemoteAccessJoinCommand | undefined {
+function buildJoinCommand(options: FrpRouteProvisioningOptions, client: FrpPanelClientRecord): RemoteAccessJoinCommand | undefined {
   if (!client.id || !client.secret) {
     return undefined
   }
@@ -252,7 +253,7 @@ async function listServers(apiUrl: string, token: string): Promise<FrpPanelServe
   return body.servers ?? []
 }
 
-async function resolveServerId(options: NormalizedRemoteAccessOptions): Promise<string> {
+async function resolveServerId(options: FrpRouteProvisioningOptions): Promise<string> {
   if (options.serverId) {
     return options.serverId
   }
@@ -355,7 +356,7 @@ function applyDerivedFrpsUrl(result: FrpPanelProvisionResult, serverScopedClient
   }
 }
 
-export async function ensurePanelProvisioning(options: NormalizedRemoteAccessOptions): Promise<FrpPanelProvisionResult> {
+export async function ensurePanelProvisioning(options: FrpRouteProvisioningOptions): Promise<FrpPanelProvisionResult> {
   const publicUrl = buildPublicUrl(options)
 
   try {
@@ -397,6 +398,7 @@ export async function ensurePanelProvisioning(options: NormalizedRemoteAccessOpt
       publicUrl,
       client: mappedClient,
       proxy: mappedProxy,
+      clientSecret: client.secret,
       joinCommand: buildJoinCommand(options, client),
     }
 

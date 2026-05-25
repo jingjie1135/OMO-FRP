@@ -5,6 +5,7 @@ import { CloudflareTunnelPageWrapper } from "../features/cloudflare/CloudflareTu
 import { createDefaultCloudflareTunnelConfig } from "../features/cloudflare/use-cloudflare-tunnel-state"
 import { ConfigPage } from "../features/config/ConfigPage"
 import { DashboardPage } from "../features/dashboard/DashboardPage"
+import { DesktopTunnelsPageWrapper } from "../features/desktop-tunnels/DesktopTunnelsPageWrapper"
 import { EndpointsPageWrapper } from "../features/endpoints/EndpointsPageWrapper"
 import { FrpPageWrapper } from "../features/frp/FrpPageWrapper"
 import { SettingsPage } from "../features/settings/SettingsPage"
@@ -81,6 +82,11 @@ export async function loadConfigPage(client: ManagementClient): Promise<React.Re
 
 export async function loadEndpointsPage(client: ManagementClient): Promise<React.ReactNode> {
   return React.createElement(EndpointsPageWrapper, { client })
+}
+
+export async function loadDesktopTunnelsPage(client: ManagementClient): Promise<React.ReactNode> {
+  const initialDevices = await client.listDesktopTunnelDevices()
+  return React.createElement(DesktopTunnelsPageWrapper, { client, initialDevices })
 }
 
 export async function loadFrpPage(client: ManagementClient): Promise<React.ReactNode> {

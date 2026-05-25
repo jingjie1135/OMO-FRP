@@ -140,4 +140,56 @@ describe("server management client", () => {
     expect(headers.get("x-management-ui-request")).toBe("1")
     expect(headers.get("authorization")).toBeNull()
   })
+  it("maps desktop tunnel requests to HTTP API", async () => {
+    const calls: Array<{ input: string; init?: RequestInit }> = []
+    const client = createServerManagementClient({
+      baseUrl: "http://127.0.0.1:4098",
+      fetch: async (input, init) => {
+        calls.push({ input, init })
+        return new Response(JSON.stringify(input.toString().endsWith("/devices") ? [] : { ok: true }), { status: 200 })
+      },
+    })
+
+    await client.listDesktopTunnelDevices()
+    await client.provisionDesktopTunnel({ deviceId: "desktop-alice", deviceName: "Alice Laptop", localHost: "127.0.0.1", localPort: 4096 })
+    await client.sendDesktopTunnelHeartbeat({ deviceId: "desktop-alice", opencodeStatus: "running", frpcStatus: "running", tunnelStatus: "connected" })
+    await client.deleteDesktopTunnelDevice("desktop-alice")
+
+    expect(calls.map((call) => call.input)).toEqual([
+      "http://127.0.0.1:4098/api/desktop-tunnels/devices",
+      "http://127.0.0.1:4098/api/desktop-tunnels/provision",
+      "http://127.0.0.1:4098/api/desktop-tunnels/heartbeat",
+      "http://127.0.0.1:4098/api/desktop-tunnels/desktop-alice",
+    ])
+    expect(calls[0]?.init?.method).toBeUndefined()
+    expect(calls[1]?.init?.method).toBe("POST")
+    expect(calls[2]?.init?.method).toBe("POST")
+    expect(calls[3]?.init?.method).toBe("DELETE")
+  })
+  it("uses the device bearer token only for desktop provision and heartbeat", async () => {
+    const calls: Array<{ input: string; init?: RequestInit }> = []
+    const client = createServerManagementClient({
+      baseUrl: "http://127.0.0.1:4098",
+      sessionToken: "session-secret",
+      deviceToken: "device-secret",
+      fetch: async (input, init) => {
+        calls.push({ input, init })
+        return new Response(JSON.stringify(input.toString().endsWith("/devices") ? [] : { ok: true }), { status: 200 })
+      },
+    })
+
+    await client.listDesktopTunnelDevices()
+    await client.provisionDesktopTunnel({ deviceId: "desktop-alice", deviceName: "Alice Laptop", localHost: "127.0.0.1", localPort: 4096 })
+    await client.sendDesktopTunnelHeartbeat({ deviceId: "desktop-alice", opencodeStatus: "running", frpcStatus: "running", tunnelStatus: "connected" })
+    await client.deleteDesktopTunnelDevice("desktop-alice")
+
+    const headers = calls.map((call) => new Headers(call.init?.headers))
+    expect(headers[0]?.get("authorization")).toBe("Bearer session-secret")
+    expect(headers[1]?.get("authorization")).toBe("Bearer device-secret")
+    expect(headers[1]?.get("x-management-ui-request")).toBeNull()
+    expect(headers[2]?.get("authorization")).toBe("Bearer device-secret")
+    expect(headers[2]?.get("x-management-ui-request")).toBeNull()
+    expect(headers[3]?.get("authorization")).toBe("Bearer session-secret")
+    expect(headers[3]?.get("x-management-ui-request")).toBe("1")
+  })
 })

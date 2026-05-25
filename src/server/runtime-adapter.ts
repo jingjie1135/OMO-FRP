@@ -19,8 +19,13 @@ import type {
   SecurityCheck,
   BackupSummary,
   Diagnostics,
+  DesktopTunnelDevice,
+  DesktopTunnelProvisionRequest,
+  DesktopTunnelProvisionResponse,
+  DesktopTunnelHeartbeatRequest,
 } from "../management-api/types"
 import { createLocalManagementRuntime } from "../management-api/local-management-runtime"
+import type { DesktopTunnelProvisioningServiceOptions } from "../core/desktop-tunnel/provisioning-service"
 
 export interface ServerRuntimeAdapter {
   getRuntimeInfo(): Promise<RuntimeInfo>
@@ -46,6 +51,10 @@ export interface ServerRuntimeAdapter {
   saveFrpConfig(config: FrpConfigRequest): Promise<void>
   startFrp(): Promise<JobResult>
   stopFrp(): Promise<JobResult>
+  listDesktopTunnelDevices(): Promise<DesktopTunnelDevice[]>
+  provisionDesktopTunnel(request: DesktopTunnelProvisionRequest): Promise<DesktopTunnelProvisionResponse>
+  sendDesktopTunnelHeartbeat(request: DesktopTunnelHeartbeatRequest): Promise<DesktopTunnelDevice>
+  deleteDesktopTunnelDevice(deviceId: string): Promise<void>
   getCloudflareTunnelStatus(): Promise<CloudflareTunnelStatus>
   saveCloudflareTunnelConfig(config: CloudflareTunnelConfigRequest): Promise<void>
   createCloudflareTunnelPlan(config: CloudflareTunnelConfigRequest): Promise<CloudflareTunnelPlan>
@@ -60,12 +69,19 @@ export interface ServerRuntimeAdapter {
 }
 
 
-export function createServerRuntimeAdapter(config: AppConfig = createEmptyServerConfig()): ServerRuntimeAdapter {
+export interface CreateServerRuntimeAdapterOptions {
+  config?: AppConfig
+  desktopTunnelProvisioning?: DesktopTunnelProvisioningServiceOptions
+}
+
+export function createServerRuntimeAdapter(options: AppConfig | CreateServerRuntimeAdapterOptions = createEmptyServerConfig()): ServerRuntimeAdapter {
+  const normalizedOptions = "mode" in options ? { config: options } : options
   return createLocalManagementRuntime({
     capabilities: SERVER_CAPABILITIES,
-    config,
+    config: normalizedOptions.config ?? createEmptyServerConfig(),
     defaultConfigDirectory: "/opt/opencode-remote-platform/config",
     frpStatusMode: "server",
+    desktopTunnelProvisioning: normalizedOptions.desktopTunnelProvisioning,
   })
 }
 

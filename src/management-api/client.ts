@@ -20,6 +20,10 @@ import type {
   SecurityCheck,
   BackupSummary,
   Diagnostics,
+  DesktopTunnelDevice,
+  DesktopTunnelProvisionRequest,
+  DesktopTunnelProvisionResponse,
+  DesktopTunnelHeartbeatRequest,
 } from "./types"
 
 export interface ManagementClient {
@@ -49,6 +53,11 @@ export interface ManagementClient {
   saveFrpConfig(config: FrpConfigRequest): Promise<void>
   startFrp(): Promise<JobResult>
   stopFrp(): Promise<JobResult>
+
+  listDesktopTunnelDevices(): Promise<DesktopTunnelDevice[]>
+  provisionDesktopTunnel(request: DesktopTunnelProvisionRequest): Promise<DesktopTunnelProvisionResponse>
+  sendDesktopTunnelHeartbeat(request: DesktopTunnelHeartbeatRequest): Promise<DesktopTunnelDevice>
+  deleteDesktopTunnelDevice(deviceId: string): Promise<void>
 
   getCloudflareTunnelStatus(): Promise<CloudflareTunnelStatus>
   saveCloudflareTunnelConfig(config: CloudflareTunnelConfigRequest): Promise<void>

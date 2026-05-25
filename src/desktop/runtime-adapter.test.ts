@@ -212,6 +212,60 @@ describe("desktop runtime adapter", () => {
     expect(checkedPorts).toEqual([4396])
   })
 
+
+  it("reuses an externally running OpenCode listener on the configured port", async () => {
+    const runtimeDir = mkdtempSync(join(tmpdir(), "omo-desktop-runtime-opencode-reuse-"))
+    const bunPath = Bun.which("bun")
+    expect(bunPath).toBeString()
+
+    const server = Bun.serve({
+      hostname: "127.0.0.1",
+      port: 4496,
+      fetch() {
+        return new Response("opencode ready")
+      },
+    })
+
+    try {
+      const adapter = createDesktopRuntimeAdapter({
+        runtimeDir,
+        isPortAvailable: async () => false,
+        canReuseOpenCodePort: async (port) => port === 4496,
+        env: {
+          ...process.env,
+          OPENCODE_SERVER_PASSWORD: "strong-password",
+        },
+        toolSpecs: [
+          {
+            id: "opencode-desktop",
+            kind: "opencode",
+            displayName: "OpenCode",
+            binaryNames: ["bun"],
+            versionArgs: ["--version"],
+            resolveBinaryPath: () => bunPath!,
+            resolveConfigDirectory: () => runtimeDir,
+            defaultPort: 4496,
+            buildStartCommand: () => ({
+              command: [bunPath!, "-e", 'setInterval(() => console.log("tick"), 25)'],
+              currentPort: 4496,
+              configDirectory: runtimeDir,
+            }),
+          },
+        ],
+      })
+
+      const result = await adapter.startTool("opencode-desktop")
+
+      expect(result.status).toBe("succeeded")
+      expect(result.message).toContain("已复用")
+      const tools = await adapter.listToolInstances()
+      expect(tools[0]?.status).toBe("running")
+      expect(tools[0]?.pid).toBeUndefined()
+      expect(tools[0]?.lastError).toBeUndefined()
+    } finally {
+      server.stop(true)
+    }
+  })
   it("reports a clear diagnostic when the managed OpenCode port is already occupied", async () => {
     const runtimeDir = mkdtempSync(join(tmpdir(), "omo-desktop-runtime-port-"))
     const bunPath = Bun.which("bun")
@@ -228,6 +282,8 @@ describe("desktop runtime adapter", () => {
     try {
       const adapter = createDesktopRuntimeAdapter({
         runtimeDir,
+        isPortAvailable: async () => false,
+        canReuseOpenCodePort: async () => false,
         env: {
           ...process.env,
           OPENCODE_SERVER_PASSWORD: "strong-password",
@@ -261,5 +317,63 @@ describe("desktop runtime adapter", () => {
     } finally {
       server.stop(true)
     }
+  })
+  it("does not reuse an externally running OpenCode listener that does not ask for a password", async () => {
+    const runtimeDir = mkdtempSync(join(tmpdir(), "omo-desktop-runtime-unprotected-opencode-"))
+    const bunPath = Bun.which("bun")
+    expect(bunPath).toBeString()
+
+    const server = Bun.serve({
+      hostname: "127.0.0.1",
+      port: 4596,
+      fetch() {
+        return new Response("opencode ready")
+      },
+    })
+
+    try {
+      const adapter = createDesktopRuntimeAdapter({
+        runtimeDir,
+        isPortAvailable: async () => false,
+        env: {
+          ...process.env,
+          OPENCODE_SERVER_PASSWORD: "strong-password",
+        },
+        toolSpecs: [
+          {
+            id: "opencode-desktop",
+            kind: "opencode",
+            displayName: "OpenCode",
+            binaryNames: ["bun"],
+            versionArgs: ["--version"],
+            resolveBinaryPath: () => bunPath!,
+            resolveConfigDirectory: () => runtimeDir,
+            defaultPort: 4596,
+            buildStartCommand: () => ({
+              command: [bunPath!, "-e", 'setInterval(() => console.log("tick"), 25)'],
+              currentPort: 4596,
+              configDirectory: runtimeDir,
+            }),
+          },
+        ],
+      })
+
+      const result = await adapter.startTool("opencode-desktop")
+
+      expect(result.status).toBe("failed")
+      expect(result.message).toContain("端口冲突")
+    } finally {
+      server.stop(true)
+    }
+  })
+  it("writes frpc.toml through saveFrpConfig before starting frpc", async () => {
+    const runtimeDir = mkdtempSync(join(tmpdir(), "omo-desktop-runtime-frpc-config-"))
+    const frpDir = join(runtimeDir, "frp")
+    const adapter = createDesktopRuntimeAdapter({ runtimeDir, toolSpecs: [] })
+    await adapter.saveFrpConfig({ endpointId: "desktop-frpc", serverAddr: "frp.example.com", serverPort: 7000, authTokenRef: "FRP_TOKEN", localHost: "127.0.0.1", localPort: 4096, proxyName: "opencode-alice", subdomain: "alice-code", transport: "tcp" })
+    const content = await Bun.file(join(frpDir, "frpc.toml")).text()
+    expect(content).toContain('serverAddr = "frp.example.com"')
+    expect(content).toContain('localIP = "127.0.0.1"')
+    expect(content).toContain('subdomain = "alice-code"')
   })
 })

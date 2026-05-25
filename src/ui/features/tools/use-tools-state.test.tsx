@@ -138,7 +138,10 @@ function createFakeClient(): FakeClientControls {
     async stopFrp() {
       return successJob
     },
-    async getCloudflareTunnelStatus() {
+    async listDesktopTunnelDevices() { return [] },
+    async provisionDesktopTunnel() { throw new Error("Desktop tunnel provisioning is not configured for this test client") },
+    async sendDesktopTunnelHeartbeat() { throw new Error("Desktop tunnel heartbeat is not configured for this test client") },
+    async deleteDesktopTunnelDevice() {},    async getCloudflareTunnelStatus() {
       return { mode: "quick", running: false, message: "Cloudflare Tunnel stopped" }
     },
     async saveCloudflareTunnelConfig() {},

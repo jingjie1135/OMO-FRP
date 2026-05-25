@@ -1,5 +1,6 @@
 import { describe, expect, it } from "bun:test"
 import { createServerApi } from "./index"
+import { createServerRuntimeAdapter } from "../runtime-adapter"
 
 describe("server api", () => {
   it("returns server runtime info", async () => {
@@ -169,6 +170,132 @@ describe("server api", () => {
     expect(response.status).toBe(200)
     expect(body.status).toBe("succeeded")
   })
+
+  it("supports desktop tunnel provision, heartbeat, list, and delete routes", async () => {
+    const api = createServerApi({
+      sessionToken: "session-secret",
+      deviceToken: "device-secret",
+      adapter: createServerRuntimeAdapter({
+        desktopTunnelProvisioning: {
+          panelUrl: "https://frp.example.com",
+          panelApiUrl: "https://frp.example.com",
+          panelRpcUrl: "wss://frp.example.com/rpc",
+          authToken: "restricted-token",
+          serverAddr: "frp.example.com",
+          serverPort: 7000,
+          provisionRoute: async () => ({ status: "ready", publicUrl: "https://alice.frp.example.com", clientSecret: "desktop-client-secret" }),
+        },
+      }),
+    })
+
+    const provisionResponse = await api.request("/api/desktop-tunnels/provision", devicePostJson({
+      deviceId: "desktop-alice",
+      deviceName: "Alice Laptop",
+      localHost: "127.0.0.1",
+      localPort: 4096,
+      proxyName: "opencode-alice",
+      preferredSubdomain: "alice",
+    }))
+    const provision = await provisionResponse.json()
+    const heartbeatResponse = await api.request("/api/desktop-tunnels/heartbeat", devicePostJson({
+      deviceId: "desktop-alice",
+      opencodeStatus: "running",
+      frpcStatus: "running",
+      tunnelStatus: "connected",
+      publicUrl: provision.publicUrl,
+      lastError: null,
+    }))
+    const heartbeat = await heartbeatResponse.json()
+    const listResponse = await api.request("/api/desktop-tunnels/devices", authenticated())
+    const devices = await listResponse.json()
+    const deleteResponse = await api.request("/api/desktop-tunnels/desktop-alice", {
+      method: "DELETE",
+      headers: {
+        authorization: "Bearer session-secret",
+        "x-management-ui-request": "1",
+      },
+    })
+
+    expect(provisionResponse.status).toBe(200)
+    expect(provision.publicUrl).toBe("https://alice.frp.example.com")
+    expect(provision.frpcConfig).toContain('serverAddr = "frp.example.com"')
+    expect(provision.frpcConfig).toContain('auth.token = "desktop-client-secret"')
+    expect(provision.frpcConfig).not.toContain("restricted-token")
+    expect(heartbeatResponse.status).toBe(200)
+    expect(heartbeat.status).toBe("online")
+    expect(listResponse.status).toBe(200)
+    expect(devices).toHaveLength(1)
+    expect(deleteResponse.status).toBe(200)
+  })
+
+  it("requires the device token for desktop provision and heartbeat routes", async () => {
+    const api = createServerApi({ sessionToken: "session-secret", deviceToken: "device-secret" })
+
+    const response = await api.request("/api/desktop-tunnels/heartbeat", postJson({
+      deviceId: "desktop-alice",
+      opencodeStatus: "running",
+      frpcStatus: "running",
+      tunnelStatus: "connected",
+    }))
+
+    expect(response.status).toBe(401)
+  })
+  it("disables desktop device routes when no device token is configured", async () => {
+    const api = createServerApi({ sessionToken: "session-secret" })
+
+    const response = await api.request("/api/desktop-tunnels/provision", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ deviceId: "desktop-alice", deviceName: "Alice Laptop", localHost: "127.0.0.1", localPort: 4096 }),
+    })
+
+    expect(response.status).toBe(401)
+  })
+
+  it("rejects unauthorized desktop device requests before parsing JSON", async () => {
+    const api = createServerApi({ sessionToken: "session-secret", deviceToken: "device-secret" })
+
+    const response = await api.request("/api/desktop-tunnels/provision", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: "{not-json",
+    })
+
+    expect(response.status).toBe(401)
+  })
+
+  it("validates desktop tunnel provision payloads before provisioning", async () => {
+    const api = createServerApi({ sessionToken: "session-secret", deviceToken: "device-secret" })
+
+    const response = await api.request("/api/desktop-tunnels/provision", devicePostJson({
+      deviceId: "desktop-alice",
+      deviceName: "Alice Laptop",
+      localHost: "0.0.0.0",
+      localPort: 70000,
+      proxyName: "bad proxy name",
+      preferredSubdomain: "bad_subdomain",
+    }))
+    const body = await response.json()
+
+    expect(response.status).toBe(400)
+    expect(body.error).toContain("localHost")
+  })
+
+  it("validates desktop tunnel heartbeat payloads before updating devices", async () => {
+    const api = createServerApi({ sessionToken: "session-secret", deviceToken: "device-secret" })
+
+    const response = await api.request("/api/desktop-tunnels/heartbeat", devicePostJson({
+      deviceId: "desktop-alice",
+      opencodeStatus: "broken",
+      frpcStatus: "running",
+      tunnelStatus: "connected",
+      publicUrl: "javascript:alert(1)",
+    }))
+    const body = await response.json()
+
+    expect(response.status).toBe(400)
+    expect(body.error).toContain("opencodeStatus")
+  })
 })
 
 function authenticated(): RequestInit {
@@ -184,5 +311,17 @@ function postJson(body: unknown): RequestInit {
       "x-management-ui-request": "1",
     },
     body: body === undefined ? undefined : JSON.stringify(body),
+  }
+}
+
+function devicePostJson(body: unknown): RequestInit {
+  return {
+    method: "POST",
+    headers: {
+      authorization: "Bearer device-secret",
+      "content-type": "application/json",
+      "x-management-ui-request": "1",
+    },
+    body: JSON.stringify(body),
   }
 }

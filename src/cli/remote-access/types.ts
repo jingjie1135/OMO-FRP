@@ -16,6 +16,7 @@ export interface RemoteAccessOptions {
   serverAddr?: string
   serverPort?: number
   transport?: string
+  localHost?: string
   localPort?: number
   remotePort?: number
   subdomain?: string
@@ -44,6 +45,7 @@ export interface NormalizedRemoteAccessOptions {
   serverPort: number
   transport: FrpTransport
   proxyType: FrpProxyType
+  localHost: string
   localPort: number
   remotePort?: number
   subdomain?: string
@@ -58,6 +60,26 @@ export interface NormalizedRemoteAccessOptions {
   json: boolean
 }
 
+export interface FrpRouteProvisioningOptions {
+  panelUrl: string
+  panelApiUrl: string
+  panelRpcUrl: string
+  authToken: string
+  serverId?: string
+  clientId: string
+  proxyName: string
+  frpBinary: string
+  serverAddr: string
+  serverPort: number
+  transport: FrpTransport
+  proxyType: FrpProxyType
+  localHost: string
+  localPort: number
+  remotePort?: number
+  subdomain?: string
+  customDomain?: string
+  https: boolean
+}
 export interface FrpcConfigInput {
   serverAddr: string
   serverPort: number

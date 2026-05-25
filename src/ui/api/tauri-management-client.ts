@@ -1,12 +1,17 @@
 import type { SettingsManagementClient } from "../../management-api/client"
-import type { CloudflareTunnelConfigRequest, CloudflareTunnelStepId, ConfigTarget, FrpConfigRequest, InstallToolRequest } from "../../management-api/types"
+import type { CloudflareTunnelConfigRequest, CloudflareTunnelStepId, ConfigTarget, DesktopTunnelHeartbeatRequest, DesktopTunnelProvisionRequest, DesktopTunnelState, FrpConfigRequest, InstallToolRequest } from "../../management-api/types"
+import { createDesktopAutoTunnelOrchestrator } from "../../desktop/auto-tunnel-orchestrator"
 
 export interface TauriInvokeBridge {
   invoke(command: string, args?: Record<string, unknown>): Promise<unknown>
 }
 
-export function createTauriManagementClient(bridge: TauriInvokeBridge): SettingsManagementClient {
-  return {
+export interface TauriManagementClient extends SettingsManagementClient {
+  startDesktopAutoTunnel(): Promise<DesktopTunnelState>
+}
+
+export function createTauriManagementClient(bridge: TauriInvokeBridge): TauriManagementClient {
+  const client: TauriManagementClient = {
     getRuntimeInfo() {
       return invokeTyped(bridge, "get_runtime_info")
     },
@@ -67,14 +72,40 @@ export function createTauriManagementClient(bridge: TauriInvokeBridge): Settings
     getFrpStatus() {
       return invokeTyped(bridge, "get_frp_status")
     },
-    saveFrpConfig(config: FrpConfigRequest) {
-      return invokeTyped(bridge, "save_frp_config", { config })
+    async saveFrpConfig(config: FrpConfigRequest, rawConfig?: string) {
+      const result = await invokeTyped<unknown>(bridge, "save_frp_config", { config, raw_config: rawConfig })
+      if (isFailedJobResult(result)) {
+        throw new Error(result.message)
+      }
     },
     startFrp() {
       return invokeTyped(bridge, "start_frp")
     },
     stopFrp() {
       return invokeTyped(bridge, "stop_frp")
+    },
+    listDesktopTunnelDevices() {
+      return invokeTyped(bridge, "list_desktop_tunnel_devices")
+    },
+    provisionDesktopTunnel(request: DesktopTunnelProvisionRequest) {
+      return invokeTyped(bridge, "provision_desktop_tunnel", { request })
+    },
+    sendDesktopTunnelHeartbeat(request: DesktopTunnelHeartbeatRequest) {
+      return invokeTyped(bridge, "send_desktop_tunnel_heartbeat", { request })
+    },
+    deleteDesktopTunnelDevice(deviceId: string) {
+      return invokeTyped(bridge, "delete_desktop_tunnel_device", { device_id: deviceId })
+    },
+    startDesktopAutoTunnel() {
+      return createDesktopAutoTunnelOrchestrator({
+        runtime: client,
+        client,
+        deviceId: "desktop-local",
+        deviceName: "Desktop Local",
+        localHost: "127.0.0.1",
+        localPort: 4096,
+        preferredSubdomain: "desktop-local",
+      }).connect()
     },
     getCloudflareTunnelStatus() {
       return invokeTyped(bridge, "get_cloudflare_tunnel_status")
@@ -110,9 +141,23 @@ export function createTauriManagementClient(bridge: TauriInvokeBridge): Settings
       return invokeTyped(bridge, "get_diagnostics")
     },
   }
+
+  return client
 }
 
 
 async function invokeTyped<T>(bridge: TauriInvokeBridge, command: string, args?: Record<string, unknown>): Promise<T> {
-  return (await bridge.invoke(command, args)) as T
+  const result = await bridge.invoke(command, args)
+  if (isErrorPayload(result)) {
+    throw new Error(result.error)
+  }
+  return result as T
+}
+
+function isErrorPayload(value: unknown): value is { error: string } {
+  return typeof value === "object" && value !== null && "error" in value && typeof (value as { error?: unknown }).error === "string"
+}
+
+function isFailedJobResult(value: unknown): value is { status: "failed"; message: string } {
+  return typeof value === "object" && value !== null && (value as { status?: unknown }).status === "failed" && typeof (value as { message?: unknown }).message === "string"
 }

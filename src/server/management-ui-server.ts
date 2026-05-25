@@ -1,10 +1,17 @@
 import { extname, join, relative, resolve } from "node:path"
+import type { FrpRouteProvisioningOptions } from "../cli/remote-access/types"
+import type { DesktopTunnelProvisioningServiceOptions } from "../core/desktop-tunnel/provisioning-service"
 import { createServerApi, type ServerApi } from "./api"
+import { createServerRuntimeAdapter } from "./runtime-adapter"
 
 export interface ManagementUiRequestHandlerOptions {
   staticRoot?: string
   api?: ServerApi
+  env?: NodeJS.ProcessEnv
+  desktopTunnelProvisionRoute?: (options: FrpRouteProvisioningOptions) => Promise<DesktopTunnelProvisioningResult>
 }
+
+type DesktopTunnelProvisioningResult = Awaited<ReturnType<NonNullable<DesktopTunnelProvisioningServiceOptions["provisionRoute"]>>>
 
 export type ManagementUiRequestHandler = (request: Request) => Promise<Response>
 
@@ -12,7 +19,13 @@ const defaultStaticRoot = resolve(process.cwd(), "dist", "ui")
 
 export function createManagementUiRequestHandler(options: ManagementUiRequestHandlerOptions = {}): ManagementUiRequestHandler {
   const staticRoot = resolve(options.staticRoot ?? defaultStaticRoot)
-  const api = options.api ?? createServerApi({ sessionToken: process.env.MANAGEMENT_API_SESSION_TOKEN })
+  const env = options.env ?? process.env
+  const desktopTunnelProvisioning = buildDesktopTunnelProvisioningOptions(env, options.desktopTunnelProvisionRoute)
+  const api = options.api ?? createServerApi({
+    sessionToken: env.MANAGEMENT_API_SESSION_TOKEN,
+    deviceToken: env.DESKTOP_TUNNEL_DEVICE_TOKEN,
+    adapter: createServerRuntimeAdapter({ desktopTunnelProvisioning }),
+  })
 
   return async function handleManagementUiRequest(request: Request): Promise<Response> {
     const url = new URL(request.url)
@@ -48,9 +61,10 @@ export function startManagementUiServer(): void {
 
 async function toRequestInit(request: Request): Promise<RequestInit> {
   const method = request.method.toUpperCase()
+  const headers = new Headers(request.headers)
   return {
     method,
-    headers: request.headers,
+    headers,
     body: method === "GET" || method === "HEAD" ? undefined : await request.text(),
   }
 }
@@ -117,6 +131,34 @@ function getContentType(path: string): string {
   }
 }
 
+function buildDesktopTunnelProvisioningOptions(
+  env: NodeJS.ProcessEnv,
+  provisionRoute?: (options: FrpRouteProvisioningOptions) => Promise<DesktopTunnelProvisioningResult>,
+): DesktopTunnelProvisioningServiceOptions | undefined {
+  const panelUrl = env.DESKTOP_TUNNEL_PANEL_URL
+  const panelApiUrl = env.DESKTOP_TUNNEL_PANEL_API_URL
+  const panelRpcUrl = env.DESKTOP_TUNNEL_PANEL_RPC_URL
+  const authToken = env.DESKTOP_TUNNEL_PANEL_AUTH_TOKEN
+  const serverAddr = env.DESKTOP_TUNNEL_FRP_SERVER_ADDR
+  const serverPort = env.DESKTOP_TUNNEL_FRP_SERVER_PORT ? parsePort(env.DESKTOP_TUNNEL_FRP_SERVER_PORT) : undefined
+
+  if (!panelUrl || !panelApiUrl || !panelRpcUrl || !authToken || !serverAddr || !serverPort) {
+    return undefined
+  }
+
+  return {
+    panelUrl,
+    panelApiUrl,
+    panelRpcUrl,
+    authToken,
+    serverId: env.DESKTOP_TUNNEL_FRP_SERVER_ID,
+    serverAddr,
+    serverPort,
+    https: env.DESKTOP_TUNNEL_PUBLIC_HTTPS === undefined ? true : env.DESKTOP_TUNNEL_PUBLIC_HTTPS !== "false",
+    frpBinary: env.DESKTOP_TUNNEL_FRP_BINARY,
+    provisionRoute,
+  }
+}
 function parsePort(value: string): number {
   const port = Number(value)
   if (!Number.isInteger(port) || port < 1 || port > 65_535) {

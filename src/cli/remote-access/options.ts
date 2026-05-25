@@ -118,6 +118,7 @@ export function normalizeRemoteAccessOptions(options: RemoteAccessOptions): Norm
     serverPort: validatePort("server port", options.serverPort ?? DEFAULT_FRP_SERVER_PORT),
     transport: normalizeTransport(options.transport),
     proxyType,
+    localHost: options.localHost ?? "127.0.0.1",
     localPort: validatePort("local port", options.localPort ?? DEFAULT_SERVER_PORT),
     remotePort: options.remotePort === undefined ? undefined : validatePort("remote port", options.remotePort),
     subdomain: options.subdomain,
