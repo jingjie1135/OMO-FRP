@@ -139,3 +139,32 @@ describe("local management runtime cloudflare tunnel", () => {
     expect(result.message).toContain("OpenCode password protection must be configured")
   })
 })
+
+describe("local management runtime desktop tunnels", () => {
+  it("provisions, lists, heartbeats, and deletes desktop tunnel devices", async () => {
+    const runtime = createLocalManagementRuntime({
+      capabilities: SERVER_CAPABILITIES,
+      defaultConfigDirectory: "/tmp/config",
+      frpStatusMode: "server",
+      config: createConfig(),
+      desktopTunnelProvisioning: {
+        panelUrl: "https://frp.example.com",
+        panelApiUrl: "https://frp.example.com",
+        panelRpcUrl: "wss://frp.example.com/rpc",
+        authToken: "restricted-token",
+        serverAddr: "frp.example.com",
+        serverPort: 7000,
+        provisionRoute: async () => ({ status: "ready", publicUrl: "https://alice.frp.example.com", clientSecret: "desktop-client-secret" }),
+      },
+    })
+    const provision = await runtime.provisionDesktopTunnel({ deviceId: "desktop-alice", deviceName: "Alice Laptop", localHost: "127.0.0.1", localPort: 4096, proxyName: "opencode-alice", preferredSubdomain: "alice" })
+    const heartbeat = await runtime.sendDesktopTunnelHeartbeat({ deviceId: "desktop-alice", opencodeStatus: "running", frpcStatus: "running", tunnelStatus: "connected", publicUrl: provision.publicUrl, lastError: null })
+    expect(provision.publicUrl).toBe("https://alice.frp.example.com")
+    expect(provision.frpcConfig).toContain('auth.token = "desktop-client-secret"')
+    expect(provision.frpcConfig).not.toContain("restricted-token")
+    expect(heartbeat.status).toBe("online")
+    expect(await runtime.listDesktopTunnelDevices()).toHaveLength(1)
+    await runtime.deleteDesktopTunnelDevice("desktop-alice")
+    expect(await runtime.listDesktopTunnelDevices()).toEqual([])
+  })
+})
