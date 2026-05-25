@@ -8,6 +8,7 @@ import { FrpConnectionCard } from "./FrpConnectionCard"
 import { FrpStatusCard } from "./FrpStatusCard"
 import { ServerFrpPanel } from "./ServerFrpPanel"
 import { createDefaultClientConfig, createDefaultServerConfig, getFrpFailureGuidance } from "./use-frp-state"
+import { ActionButton, PageHeader, SectionCard, StatusBadge } from "../../components/FomoPrimitives"
 
 export type FrpPanelKind = "server" | "client" | "unavailable"
 
@@ -49,21 +50,19 @@ export function FrpPage(state: FrpPageState) {
   const publicUrl = state.status.publicUrl ?? clientPublicUrl
 
   if (state.loading) {
-    return <div className="p-8 text-gray-500">正在加载 FRP 状态...</div>
+    return <div className="p-8 text-slate-500">正在加载 FRP 状态...</div>
   }
 
   if (state.error) {
-    return <div role="alert" className="p-4 bg-red-50 text-red-700 rounded border border-red-200">FRP 错误：{state.error}</div>
+    return <div role="alert" className="m-8 rounded-xl border border-red-200 bg-red-50 p-4 text-red-700">FRP 错误：{state.error}</div>
   }
 
   return (
     <div className="space-y-6 p-8">
-      <div>
-        <p className="text-sm font-medium text-slate-500">隧道状态与连接配置</p>
-        <h1 className="text-2xl font-semibold text-slate-900">FRP 穿透</h1>
-      </div>
+      <PageHeader eyebrow="隧道状态与连接配置" title="FRP 穿透" description="统一管理服务端 frps、桌面端 frpc 和公网入口路由。" />
       {panel !== "unavailable" && (
-        <div className="flex flex-col items-start justify-between gap-6 rounded-xl border border-slate-200 bg-white p-6 shadow-sm sm:flex-row sm:items-center">
+        <SectionCard>
+        <div className="flex flex-col items-start justify-between gap-6 sm:flex-row sm:items-center">
           <div className="flex items-center space-x-6">
             <div className={`flex h-16 w-16 items-center justify-center rounded-full ${state.status.running ? "bg-emerald-50 text-emerald-500" : "bg-slate-50 text-slate-400"}`}>
               <Network className="h-8 w-8" />
@@ -71,9 +70,7 @@ export function FrpPage(state: FrpPageState) {
             <div>
               <div className="mb-1 flex items-center space-x-3">
                 <span className="text-sm font-semibold uppercase tracking-wider text-slate-800">{panel === "server" ? "FRP 服务端" : "FRP 客户端"}</span>
-                <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${state.status.running ? "bg-emerald-100 text-emerald-700" : "bg-slate-100 text-slate-600"}`}>
-                  {state.status.running ? "运行中" : "已断开"}
-                </span>
+                <StatusBadge tone={state.status.running ? "success" : "neutral"}>{state.status.running ? "运行中" : "已断开"}</StatusBadge>
               </div>
               {state.status.running && publicUrl ? (
                 <p className="mt-2 font-mono text-sm text-slate-600">
@@ -84,22 +81,20 @@ export function FrpPage(state: FrpPageState) {
               )}
             </div>
           </div>
-          <button
-            type="button"
+          <ActionButton
             onClick={() => void (state.status.running ? state.stopFrp?.() : state.startFrp?.())}
             disabled={state.status.running ? !state.stopFrp : !state.startFrp}
-            className={`flex items-center justify-center rounded-lg px-6 py-3 font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${
-              state.status.running ? "border border-red-200 bg-red-50 text-red-600 hover:bg-red-100" : "bg-emerald-500 text-white shadow-sm hover:bg-emerald-600"
-            }`}
+            tone={state.status.running ? "danger" : "success"}
           >
             {state.status.running ? <><Unlink className="mr-2 h-5 w-5" /> 断开连接</> : <><LinkIcon className="mr-2 h-5 w-5" /> 建立连接</>}
-          </button>
+          </ActionButton>
         </div>
+        </SectionCard>
       )}
       <section aria-label="FRP 状态" className="space-y-4">
         {panel === "server" && (
           <div className="space-y-4">
-            <h2 className="text-lg font-semibold">FRP 服务端</h2>
+            <h2 className="sr-only">FRP 服务端</h2>
             <FrpStatusCard {...state.status} />
             <ServerFrpPanel
               status={state.status}
@@ -114,7 +109,7 @@ export function FrpPage(state: FrpPageState) {
               getActionError={state.getActionError}
             />
             {!state.capabilities.canManageFrpClient && (
-              <p className="text-sm text-gray-500 italic">当前处于服务器模式，暂不支持桌面端 frpc 操作。</p>
+              <p className="text-sm italic text-slate-500">当前处于服务器模式，暂不支持桌面端 frpc 操作。</p>
             )}
             <div className="hidden" data-testid="frp-summary" data-frp-panel="server" />
           </div>
@@ -122,7 +117,7 @@ export function FrpPage(state: FrpPageState) {
 
         {panel === "client" && (
           <div className="space-y-4">
-            <h2 className="text-lg font-semibold">FRP 客户端</h2>
+            <h2 className="sr-only">FRP 客户端</h2>
             <FrpStatusCard {...state.status} />
             <>
               <FrpConnectionCard
@@ -145,7 +140,7 @@ export function FrpPage(state: FrpPageState) {
                 getActionStatus={state.getActionStatus}
                 getActionError={state.getActionError}
               />
-              <h3 className="text-md font-medium mt-6">入口路由配置</h3>
+              <h3 className="mt-6 text-base font-medium text-slate-800">入口路由配置</h3>
               <EndpointRouteForm
                 serverAddr={clientConfig.serverAddr || "not configured"}
                 serverPort={clientConfig.serverPort}
@@ -159,14 +154,14 @@ export function FrpPage(state: FrpPageState) {
               />
             </>
             {!state.capabilities.canManageFrpServer && (
-              <p className="text-sm text-gray-500 italic">桌面模式下不支持管理 FRP 服务端或系统服务。</p>
+              <p className="text-sm italic text-slate-500">桌面模式下不支持管理 FRP 服务端或系统服务。</p>
             )}
             <div className="hidden" data-testid="frp-summary" data-frp-panel="client" />
           </div>
         )}
 
         {panel === "unavailable" && (
-          <div role="alert" className="p-4 bg-yellow-50 text-yellow-700 rounded border border-yellow-200">
+          <div role="alert" className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-amber-700">
             <h2 className="font-bold mb-2">能力受限</h2>
             <p>当前模式或权限下暂时无法管理 FRP。</p>
             <p className="text-sm mt-2">原因：当前运行时既不能管理 FRP 服务端，也不能管理 FRP 客户端。</p>

@@ -3,6 +3,7 @@ import type { FrpStatus } from "../../../management-api/types"
 import type { FrpServerConfig, PublicEndpoint } from "../../../core/app-config/types"
 import { AsyncActionStatus } from "../../components/AsyncActionStatus"
 import { ErrorState } from "../../components/ErrorState"
+import { ActionButton, FactCard, FormField, SectionCard } from "../../components/FomoPrimitives"
 import { getFrpPanelActions } from "./frp-panel-actions"
 import { createDefaultServerConfig, maskFrpTokenRef, validateFrpServerConfig } from "./use-frp-state"
 
@@ -37,82 +38,77 @@ export function ServerFrpPanel(state: ServerFrpPanelState) {
   const actionPending = saveStatus === "pending" || startStatus === "pending" || stopStatus === "pending"
 
   return (
-    <section aria-labelledby="frp-server-heading" className="space-y-4 p-4 bg-white rounded shadow border">
-      <h2 id="frp-server-heading" className="text-lg font-semibold">FRP 服务端管理</h2>
-      <div className="font-mono text-sm">
+    <SectionCard title="FRP 服务端管理" description="配置 frp-panel、frps 监听地址和桌面端连接材料。">
+      <h2 id="frp-server-heading" className="sr-only">FRP 服务端管理</h2>
+      <div className="hidden font-mono text-sm">
         <p>server-frp:{state.status.running ? "running" : "stopped"}</p>
         <p>message:{state.status.message}</p>
         <p>actions:{getFrpPanelActions("server").join("|")}</p>
         <p>endpoints:{state.endpointCount}</p>
         <p>clients:{state.connectedClients}</p>
       </div>
-      <dl className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
-        <div><dt className="font-medium">Panel 地址</dt><dd>{config.panelUrl || "未配置"}</dd></div>
-        <div><dt className="font-medium">RPC 地址</dt><dd>{config.rpcUrl || "未配置"}</dd></div>
-        <div><dt className="font-medium">服务端地址</dt><dd>{config.serverAddr || "未配置"}</dd></div>
-        <div><dt className="font-medium">绑定端口</dt><dd>{config.bindPort}</dd></div>
-        <div><dt className="font-medium">控制台状态</dt><dd>{config.dashboardEnabled ? "已启用" : "已停用"}</dd></div>
-        <div><dt className="font-medium">令牌引用</dt><dd>{maskFrpTokenRef(config.authTokenRef)}</dd></div>
+      <dl className="grid grid-cols-1 gap-3 md:grid-cols-2">
+        <FactCard label="Panel 地址" value={config.panelUrl || "未配置"} mono />
+        <FactCard label="RPC 地址" value={config.rpcUrl || "未配置"} mono />
+        <FactCard label="服务端地址" value={config.serverAddr || "未配置"} mono />
+        <FactCard label="绑定端口" value={config.bindPort} />
+        <FactCard label="控制台状态" value={config.dashboardEnabled ? "已启用" : "已停用"} tone={config.dashboardEnabled ? "success" : "neutral"} />
+        <FactCard label="令牌引用" value={maskFrpTokenRef(config.authTokenRef)} mono />
       </dl>
       <form
         aria-label="FRP server configuration form"
-        className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm"
+        className="mt-6 grid grid-cols-1 gap-4 md:grid-cols-2"
         onSubmit={(event) => {
           event.preventDefault()
           if (!validation.ok) return
           void state.saveConfig?.(draft)
         }}
       >
-        <label className="space-y-1">
-          <span className="font-medium">Panel 地址</span>
-          <input name="panelUrl" value={draft.panelUrl} onChange={(event) => setDraft({ ...draft, panelUrl: event.currentTarget.value })} className="w-full rounded border p-2" />
-        </label>
-        <label className="space-y-1">
-          <span className="font-medium">RPC 地址</span>
-          <input name="rpcUrl" value={draft.rpcUrl} onChange={(event) => setDraft({ ...draft, rpcUrl: event.currentTarget.value })} className="w-full rounded border p-2" />
-        </label>
-        <label className="space-y-1">
-          <span className="font-medium">服务端地址</span>
-          <input name="serverAddr" value={draft.serverAddr} onChange={(event) => setDraft({ ...draft, serverAddr: event.currentTarget.value })} className="w-full rounded border p-2" />
-        </label>
-        <label className="space-y-1">
-          <span className="font-medium">绑定端口</span>
-          <input name="bindPort" type="number" value={draft.bindPort} onChange={(event) => setDraft({ ...draft, bindPort: Number(event.currentTarget.value) })} className="w-full rounded border p-2" />
-        </label>
-        <label className="space-y-1">
-          <span className="font-medium">令牌引用</span>
-          <input name="authTokenRef" value={draft.authTokenRef} onChange={(event) => setDraft({ ...draft, authTokenRef: event.currentTarget.value })} className="w-full rounded border p-2" />
-        </label>
-        <label className="flex items-center gap-2 pt-6">
+        <FormField label="Panel 地址">
+          <input name="panelUrl" value={draft.panelUrl} onChange={(event) => setDraft({ ...draft, panelUrl: event.currentTarget.value })} />
+        </FormField>
+        <FormField label="RPC 地址">
+          <input name="rpcUrl" value={draft.rpcUrl} onChange={(event) => setDraft({ ...draft, rpcUrl: event.currentTarget.value })} />
+        </FormField>
+        <FormField label="服务端地址">
+          <input name="serverAddr" value={draft.serverAddr} onChange={(event) => setDraft({ ...draft, serverAddr: event.currentTarget.value })} />
+        </FormField>
+        <FormField label="绑定端口">
+          <input name="bindPort" type="number" value={draft.bindPort} onChange={(event) => setDraft({ ...draft, bindPort: Number(event.currentTarget.value) })} />
+        </FormField>
+        <FormField label="令牌引用">
+          <input name="authTokenRef" value={draft.authTokenRef} onChange={(event) => setDraft({ ...draft, authTokenRef: event.currentTarget.value })} />
+        </FormField>
+        <label className="flex items-center gap-2 pt-6 text-sm font-medium text-slate-700">
           <input name="dashboardEnabled" type="checkbox" checked={draft.dashboardEnabled} onChange={(event) => setDraft({ ...draft, dashboardEnabled: event.currentTarget.checked })} />
-          <span className="font-medium">启用控制台</span>
+          <span>启用控制台</span>
         </label>
-        <button type="submit" disabled={!state.saveConfig || !validation.ok || actionPending} className="px-3 py-2 rounded bg-blue-600 text-white disabled:bg-gray-300">保存服务端配置</button>
+        <ActionButton type="submit" disabled={!state.saveConfig || !validation.ok || actionPending} tone="primary">保存服务端配置</ActionButton>
       </form>
-      <section aria-label="FRP client list" className="space-y-2">
-        <h3 className="font-medium">客户端列表</h3>
+      <section aria-label="FRP client list" className="mt-6 space-y-2 rounded-lg border border-slate-200 bg-slate-50 p-4">
+        <h3 className="font-medium text-slate-800">客户端列表</h3>
         {state.status.client ? (
-          <p className="text-sm">{state.status.client.id}: {state.status.client.status}{state.status.client.lastSeenAt ? ` (last seen ${state.status.client.lastSeenAt})` : ""}</p>
+          <p className="text-sm text-slate-600">{state.status.client.id}: {state.status.client.status}{state.status.client.lastSeenAt ? ` (last seen ${state.status.client.lastSeenAt})` : ""}</p>
         ) : (
-          <p className="text-sm text-gray-500">当前没有已连接的桌面端客户端。</p>
+          <p className="text-sm text-slate-500">当前没有已连接的桌面端客户端。</p>
         )}
       </section>
-      <section aria-label="Desktop connection information" className="space-y-2">
-        <h3 className="font-medium">桌面端连接信息</h3>
+      <section aria-label="Desktop connection information" className="mt-4 space-y-2 rounded-lg border border-slate-200 bg-slate-50 p-4">
+        <h3 className="font-medium text-slate-800">桌面端连接信息</h3>
         {(state.endpoints ?? []).filter((endpoint) => endpoint.targetType === "desktop-frp").map((endpoint) => (
-          <p key={endpoint.id} className="text-sm">{endpoint.name}: {endpoint.protocol}://{endpoint.domain} ({endpoint.status})</p>
+          <p key={endpoint.id} className="text-sm text-slate-600">{endpoint.name}: {endpoint.protocol}://{endpoint.domain} ({endpoint.status})</p>
         ))}
-        {state.status.proxy && <p className="text-sm">Proxy {state.status.proxy.name}: {state.status.proxy.status} {state.status.proxy.publicUrl ?? ""}</p>}
+        {state.status.proxy && <p className="text-sm text-slate-600">Proxy {state.status.proxy.name}: {state.status.proxy.status} {state.status.proxy.publicUrl ?? ""}</p>}
       </section>
-      {!validation.ok && <p className="text-sm text-amber-700 bg-amber-50 border border-amber-200 rounded p-2">{validation.issues.join(" ")}</p>}
-      <div className="flex flex-wrap gap-2 items-center">
-        <button type="button" disabled={!state.startFrp || !validation.ok || actionPending || state.status.running} onClick={() => void state.startFrp?.()} className="px-3 py-2 rounded bg-green-600 text-white disabled:bg-gray-300">启动 FRP 服务端</button>
-        <button type="button" disabled={!state.stopFrp || actionPending || !state.status.running} onClick={() => void state.stopFrp?.()} className="px-3 py-2 rounded bg-red-600 text-white disabled:bg-gray-300">停止 FRP 服务端</button>
+      {!validation.ok && <p className="mt-4 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-700">{validation.issues.join(" ")}</p>}
+      <div className="mt-6 flex flex-wrap items-center gap-2">
+        <ActionButton type="button" disabled={!state.startFrp || !validation.ok || actionPending || state.status.running} onClick={() => void state.startFrp?.()} tone="success">启动 FRP 服务端</ActionButton>
+        <ActionButton type="button" disabled={!state.stopFrp || actionPending || !state.status.running} onClick={() => void state.stopFrp?.()} tone="danger">停止 FRP 服务端</ActionButton>
         <AsyncActionStatus status={startStatus === "idle" ? stopStatus : startStatus} />
       </div>
       {saveError && <ErrorState error={saveError} onRetry={() => void state.saveConfig?.(draft)} />}
       {startError && <ErrorState error={startError} onRetry={() => void state.startFrp?.()} />}
       {stopError && <ErrorState error={stopError} onRetry={() => void state.stopFrp?.()} />}
-    </section>
+    </SectionCard>
   )
 }
