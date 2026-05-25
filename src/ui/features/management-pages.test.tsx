@@ -193,6 +193,49 @@ const serverInfo: RuntimeInfo = {
 }
 
 describe("management UI pages", () => {
+  it("keeps Tools, Endpoints, and FRP tabs on the shared FOMO visual grammar", async () => {
+    const toolsContainer = render(
+      <ToolsPage
+        client={createToolsPageClient(serverInfo.config.toolInstances, [{ kind: "opencode", displayName: "OpenCode", detected: true }])}
+      />,
+    )
+    await act(async () => {})
+    expect(toolsContainer.innerHTML).toContain("rounded-xl border border-slate-200 bg-white shadow-sm")
+    expect(toolsContainer.innerHTML).toContain("border-b border-slate-200 bg-slate-50 px-6 py-4")
+    expect(toolsContainer.innerHTML).not.toContain("bg-white p-4 rounded shadow border")
+    expect(toolsContainer.innerHTML).not.toContain("bg-gray-50")
+
+    const endpointsContainer = render(
+      <EndpointsPage
+        endpoints={serverInfo.config.publicEndpoints}
+        runtimeInfo={serverInfo}
+        saveEndpoint={async () => {}}
+        enableEndpoint={async () => {}}
+        disableEndpoint={async () => {}}
+        checkSafety={() => ({ ok: true, issues: [], suggestion: "Endpoint is ready to enable." })}
+      />,
+    )
+    expect(endpointsContainer.innerHTML).toContain("rounded-xl border border-slate-200 bg-white shadow-sm")
+    expect(endpointsContainer.textContent).toContain("公网域名")
+    expect(endpointsContainer.textContent).not.toContain("Domain / Public Host")
+    expect(endpointsContainer.innerHTML).not.toContain("bg-white p-4 rounded shadow border")
+    expect(endpointsContainer.innerHTML).not.toContain("divide-gray-200")
+
+    const frpContainer = render(
+      <FrpPage
+        capabilities={serverInfo.capabilities}
+        status={{ mode: "server", running: true, message: "FRP server is running." }}
+        endpoints={serverInfo.config.publicEndpoints}
+        runtimeInfo={serverInfo}
+      />,
+    )
+    expect(frpContainer.innerHTML).toContain("rounded-xl border border-slate-200 bg-white shadow-sm")
+    expect(frpContainer.innerHTML).toContain("border-b border-slate-200 bg-slate-50 px-6 py-4")
+    expect(frpContainer.textContent).not.toContain("FRP Client Management")
+    expect(frpContainer.innerHTML).not.toContain("bg-white rounded shadow border")
+    expect(frpContainer.innerHTML).not.toContain("bg-gray-50")
+  })
+
   it("renders dashboard capability matrix with visible reasons", () => {
     const container = render(<DashboardPage info={serverInfo} />)
 
