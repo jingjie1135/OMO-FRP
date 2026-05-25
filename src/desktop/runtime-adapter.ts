@@ -1,8 +1,9 @@
 import { existsSync, readFileSync } from "node:fs"
-import { appendFile, mkdir, readFile } from "node:fs/promises"
+import { appendFile, mkdir, readFile, writeFile } from "node:fs/promises"
 import { homedir } from "node:os"
 import { join, win32 } from "node:path"
 import { spawn, type ChildProcessByStdio } from "node:child_process"
+import { connect } from "node:net"
 import type { Readable } from "node:stream"
 
 import {
@@ -20,6 +21,7 @@ import { isPortAvailable } from "../shared/port-utils"
 import { redactSensitiveText } from "../shared/redact-sensitive-text"
 import { spawnSync } from "../shared/bun-spawn-shim"
 import { getOpenCodeConfigPaths } from "../shared/opencode-config-dir"
+import { buildFrpClientToml } from "../core/frp/frp-config"
 
 const DEFAULT_OPENCODE_PORT = 4096
 const DEFAULT_FRPC_SERVER_PORT = 7000
@@ -85,6 +87,7 @@ export interface DesktopRuntimeAdapter {
   restartTool(instanceId: string): Promise<JobResult>
   getToolLogs(instanceId: string): Promise<LogLine[]>
   getFrpStatus(): Promise<FrpStatus>
+  saveFrpConfig(config: FrpClientConfig, rawConfig?: string): Promise<void>
   startFrp(): Promise<JobResult>
   stopFrp(): Promise<JobResult>
 }
@@ -94,6 +97,7 @@ export interface DesktopRuntimeAdapterOptions {
   runtimeDir?: string
   toolSpecs?: DesktopToolSpec[]
   isPortAvailable?: (port: number) => Promise<boolean>
+  canReuseOpenCodePort?: (port: number) => Promise<boolean>
 }
 
 const DEFAULT_TOOL_SPECS: DesktopToolSpec[] = [
@@ -213,6 +217,7 @@ class DesktopRuntimeAdapterImpl implements DesktopRuntimeAdapter {
   private readonly runtimeDir: string
   private readonly specs: DesktopToolSpec[]
   private readonly isPortAvailable: (port: number) => Promise<boolean>
+  private readonly canReuseOpenCodePort: (port: number) => Promise<boolean>
   private readonly states = new Map<string, ManagedToolState>()
 
   constructor(options: DesktopRuntimeAdapterOptions = {}) {
@@ -220,6 +225,7 @@ class DesktopRuntimeAdapterImpl implements DesktopRuntimeAdapter {
     this.runtimeDir = options.runtimeDir ?? getDesktopRuntimeDir(this.env)
     this.specs = options.toolSpecs ?? DEFAULT_TOOL_SPECS
     this.isPortAvailable = options.isPortAvailable ?? isPortAvailable
+    this.canReuseOpenCodePort = options.canReuseOpenCodePort ?? canReuseOpenCodePort
 
     for (const spec of this.specs) {
       this.states.set(spec.id, {
@@ -289,6 +295,21 @@ class DesktopRuntimeAdapterImpl implements DesktopRuntimeAdapter {
 
     const currentPort = startCommand.currentPort ?? instance.currentPort ?? instance.defaultPort
     if (spec.kind === "opencode" && !(await this.isPortAvailable(currentPort))) {
+      if (await this.canReuseOpenCodePort(currentPort)) {
+        state.process = undefined
+        state.pid = undefined
+        state.stopRequested = false
+        state.status = "running"
+        state.binaryPath = detection.binaryPath
+        state.version = detection.version
+        state.configDirectory = startCommand.configDirectory ?? detection.configDirectory
+        state.configFile = state.configDirectory ? resolveConfigFile(spec, state.configDirectory, this.runtimeDir) : undefined
+        state.workingDirectory = startCommand.workingDirectory ?? this.runtimeDir
+        state.currentPort = currentPort
+        state.lastExitCode = undefined
+        state.lastError = undefined
+        return createJobResult(instanceId, "succeeded", `${spec.displayName} 已复用本机 ${currentPort} 端口上的运行实例。`)
+      }
       state.lastError = `端口冲突：${currentPort} 已被占用。`
       state.status = "error"
       return createJobResult(instanceId, "failed", state.lastError)
@@ -417,6 +438,21 @@ class DesktopRuntimeAdapterImpl implements DesktopRuntimeAdapter {
     }
   }
 
+
+  async saveFrpConfig(config: FrpClientConfig, rawConfig?: string): Promise<void> {
+    const spec = this.specs.find((item) => item.id === "frpc-desktop")
+    const configDirectory = spec?.resolveConfigDirectory(this.runtimeDir, this.env) ?? join(this.runtimeDir, "frp")
+    const configFile = join(configDirectory, "frpc.toml")
+    await mkdir(configDirectory, { recursive: true })
+    await writeFile(configFile, rawConfig ?? buildFrpClientToml(config), "utf8")
+
+    const state = this.states.get("frpc-desktop")
+    if (state) {
+      state.configDirectory = configDirectory
+      state.configFile = configFile
+      state.currentPort = config.localPort
+    }
+  }
   startFrp(): Promise<JobResult> {
     return this.startTool("frpc-desktop")
   }
@@ -586,6 +622,41 @@ export function createEmptyDesktopConfig(): AppConfig {
   }
 }
 
+async function canReuseOpenCodePort(port: number): Promise<boolean> {
+  return new Promise((resolve) => {
+    const socket = connect({ host: "127.0.0.1", port })
+    let response = ""
+    let finished = false
+
+    const finish = (reusable: boolean) => {
+      if (finished) return
+      finished = true
+      socket.destroy()
+      resolve(reusable)
+    }
+
+    socket.setEncoding("utf8")
+    socket.setTimeout(1000)
+    socket.once("connect", () => {
+      socket.write("GET / HTTP/1.1\r\nHost: 127.0.0.1\r\nConnection: close\r\n\r\n")
+    })
+    socket.on("data", (chunk: string) => {
+      response += chunk
+      if (isPasswordProtectedOpenCodeResponse(response)) {
+        finish(true)
+      }
+    })
+    socket.once("end", () => finish(isPasswordProtectedOpenCodeResponse(response)))
+    socket.once("close", () => finish(isPasswordProtectedOpenCodeResponse(response)))
+    socket.once("timeout", () => finish(false))
+    socket.once("error", () => finish(false))
+  })
+}
+
+function isPasswordProtectedOpenCodeResponse(response: string): boolean {
+  const normalized = response.toLowerCase()
+  return normalized.includes("opencode") && (normalized.includes("401") || normalized.includes("unauthorized") || normalized.includes("login") || normalized.includes("password"))
+}
 function getDesktopRuntimeDir(env: NodeJS.ProcessEnv): string {
   if (process.platform === "win32") {
     const appData = env.APPDATA || join(homedir(), "AppData", "Roaming")
