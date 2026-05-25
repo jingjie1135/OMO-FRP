@@ -183,6 +183,65 @@ export interface CloudflareTunnelStatus {
   suggestion?: string
 }
 
+export type DesktopTunnelProcessStatus = "unknown" | "starting" | "running" | "stopped" | "error"
+export type DesktopTunnelConnectionStatus = "unknown" | "provisioning" | "connected" | "disconnected" | "error"
+export type DesktopTunnelDeviceStatus = "online" | "offline" | "error"
+
+export interface DesktopTunnelDevice {
+  id: string
+  name: string
+  status: DesktopTunnelDeviceStatus
+  opencodeStatus: DesktopTunnelProcessStatus
+  tunnelStatus: DesktopTunnelConnectionStatus
+  frpcStatus: DesktopTunnelProcessStatus
+  publicUrl?: string
+  localHost: string
+  localPort: number
+  proxyName: string
+  subdomain?: string
+  lastSeenAt?: string
+  lastError?: string
+}
+
+export interface DesktopTunnelProvisionRequest {
+  deviceId: string
+  deviceName: string
+  localHost: string
+  localPort: number
+  proxyName?: string
+  preferredSubdomain?: string
+}
+
+export interface DesktopTunnelProvisionResponse {
+  deviceId: string
+  publicUrl: string
+  serverAddr: string
+  serverPort: number
+  proxyName: string
+  subdomain?: string
+  frpcConfig: string
+}
+
+export interface DesktopTunnelHeartbeatRequest {
+  deviceId: string
+  opencodeStatus: DesktopTunnelProcessStatus
+  frpcStatus: DesktopTunnelProcessStatus
+  tunnelStatus: DesktopTunnelConnectionStatus
+  publicUrl?: string
+  lastError?: string | null
+}
+
+export interface DesktopTunnelState {
+  deviceId: string
+  deviceName: string
+  opencodeStatus: DesktopTunnelProcessStatus
+  tunnelStatus: DesktopTunnelConnectionStatus
+  frpcStatus: DesktopTunnelProcessStatus
+  publicUrl?: string
+  localPort: number
+  lastHeartbeatAt?: string
+  lastError?: string
+}
 export interface SecurityCheck {
   id: string
   label: string
