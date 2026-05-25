@@ -1,5 +1,5 @@
 import React from "react"
-import { Globe, LayoutDashboard, RefreshCw, Server, Settings, Shield, Wrench } from "lucide-react"
+import { Globe, LayoutDashboard, Monitor, RefreshCw, Server, Settings, Shield, Wrench } from "lucide-react"
 import type { RuntimeMode } from "../../core/app-config/types"
 
 export interface LayoutRoute {
@@ -82,7 +82,9 @@ function RouteIcon({ path }: { path: string }) {
         ? Globe
         : path === "/frp"
           ? Shield
-          : Settings
+          : path === "/desktop-tunnels"
+            ? Monitor
+            : Settings
 
   return <Icon className="mr-3 h-5 w-5 text-slate-500" />
 }

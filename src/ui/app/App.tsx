@@ -3,7 +3,7 @@ import { renderToStaticMarkup } from "react-dom/server"
 import type { ManagementClient } from "../../management-api/client"
 import type { RuntimeInfo } from "../../management-api/types"
 import { redactSensitiveText } from "../../shared/redact-sensitive-text"
-import { loadCloudflareTunnelPage, loadConfigPage, loadDashboardPage, loadEndpointsPage, loadFrpPage, loadSettingsPage, loadToolsPage } from "./page-loaders"
+import { loadCloudflareTunnelPage, loadConfigPage, loadDashboardPage, loadDesktopTunnelsPage, loadEndpointsPage, loadFrpPage, loadSettingsPage, loadToolsPage } from "./page-loaders"
 import { AppLayout } from "../layout/AppLayout"
 import { getRoutesForCapabilities } from "../routes/routes"
 
@@ -23,12 +23,13 @@ export function App({ runtimeInfo, children }: AppProps) {
 export async function renderManagementApp(client: ManagementClient): Promise<string> {
   try {
     const runtimeInfo = await client.getRuntimeInfo()
-    const [dashboard, tools, config, endpoints, frp, cloudflare, settings] = await Promise.all([
+    const [dashboard, tools, config, endpoints, frp, desktopTunnels, cloudflare, settings] = await Promise.all([
       loadDashboardPage(client),
       loadToolsPage(client),
       loadConfigPage(client),
       loadEndpointsPage(client),
       loadFrpPage(client),
+      loadDesktopTunnelsPage(client),
       runtimeInfo.capabilities.canManageCloudflareTunnel ? loadCloudflareTunnelPage(client) : Promise.resolve(null),
       loadSettingsPage(client),
     ])
@@ -40,6 +41,7 @@ export async function renderManagementApp(client: ManagementClient): Promise<str
         {config}
         {endpoints}
         {frp}
+        {desktopTunnels}
         {cloudflare}
         {settings}
       </App>,

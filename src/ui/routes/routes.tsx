@@ -7,6 +7,7 @@ const baseRoutes: LayoutRoute[] = [
   { path: "/endpoints", label: "公网入口" },
   { path: "/config", label: "配置与备份" },
   { path: "/frp", label: "FRP 穿透" },
+  { path: "/desktop-tunnels", label: "远程设备" },
   { path: "/settings", label: "系统设置" },
 ]
 
