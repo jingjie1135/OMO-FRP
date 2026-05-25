@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it } from "bun:test"
 import { act } from "react"
 import { createRoot, type Root } from "react-dom/client"
 import type { ManagementClient } from "../../management-api/client"
-import type { ConfigTarget, Diagnostics, FrpStatus, JobResult, RuntimeInfo } from "../../management-api/types"
+import type { ConfigTarget, DesktopTunnelDevice, Diagnostics, FrpStatus, JobResult, RuntimeInfo } from "../../management-api/types"
 import type { DashboardViewModel } from "../features/dashboard/dashboard-view-model"
 import { ManagementDashboardApp } from "./ManagementDashboardApp"
 
@@ -52,7 +52,7 @@ function createDashboard(message: string, logMessage = "OpenCode started"): Dash
   }
 }
 
-function createClient(results: Array<DashboardViewModel | Error>): TestManagementClient {
+function createClient(results: Array<DashboardViewModel | Error>, desktopDevices: DesktopTunnelDevice[] = []): TestManagementClient {
   let callIndex = 0
   const successJob: JobResult = { jobId: "settings", status: "succeeded", message: "ok" }
   const configTargets: ConfigTarget[] = []
@@ -145,7 +145,10 @@ function createClient(results: Array<DashboardViewModel | Error>): TestManagemen
     async stopFrp() {
       return { jobId: "stop-frp", status: "succeeded", message: "stopped" }
     },
-    async getCloudflareTunnelStatus() {
+    async listDesktopTunnelDevices() { return desktopDevices },
+    async provisionDesktopTunnel() { throw new Error("Desktop tunnel provisioning is not configured for this test client") },
+    async sendDesktopTunnelHeartbeat() { throw new Error("Desktop tunnel heartbeat is not configured for this test client") },
+    async deleteDesktopTunnelDevice() {},    async getCloudflareTunnelStatus() {
       return { mode: "quick", running: false, message: "Cloudflare Tunnel stopped" }
     },
     async saveCloudflareTunnelConfig() {},
@@ -219,6 +222,7 @@ describe("ManagementDashboardApp", () => {
     expect(container.textContent).toContain("工具管理")
     expect(container.textContent).toContain("公网入口")
     expect(container.textContent).toContain("Cloudflare 隧道")
+    expect(container.textContent).toContain("远程设备")
     expect(container.textContent).toContain("服务器模式")
     expect(container.textContent).toContain("系统在线")
     expect(container.textContent).toContain("FRP server is running.")
@@ -267,6 +271,21 @@ describe("ManagementDashboardApp", () => {
     expect(container.textContent).toContain("/var/log/opencode/system.log")
   })
 
+  it("switches to the remote desktop devices page and renders tunnel status", async () => {
+    const container = await renderApp(createClient([createDashboard("FRP server is running.")], [
+      { id: "desktop-alice", name: "Alice Laptop", status: "online", opencodeStatus: "running", tunnelStatus: "connected", frpcStatus: "running", publicUrl: "https://alice.frp.example.com", localHost: "127.0.0.1", localPort: 4096, proxyName: "opencode-alice", subdomain: "alice", lastSeenAt: "2026-05-25T00:00:00.000Z" },
+    ]))
+    const devicesTab = Array.from(container.querySelectorAll("button")).find((button) => button.textContent?.includes("远程设备"))
+
+    expect(devicesTab).toBeDefined()
+    await act(async () => devicesTab?.dispatchEvent(new MouseEvent("click", { bubbles: true })))
+    await act(async () => {})
+
+    expect(container.textContent).toContain("远程设备")
+    expect(container.textContent).toContain("Alice Laptop")
+    expect(container.textContent).toContain("https://alice.frp.example.com")
+    expect(container.textContent).toContain("打开 OpenCode")
+  })
   it("loads config page data from a real tool instance when opened in the dashboard shell", async () => {
     const client = createClient([createDashboard("FRP server is running.")]) as ManagementClient & { configTargets: ConfigTarget[] }
     const container = await renderApp(client)
