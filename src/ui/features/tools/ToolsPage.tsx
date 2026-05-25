@@ -5,6 +5,7 @@ import { useToolsState, type ToolsState } from "./use-tools-state"
 import { AsyncActionStatus } from "../../components/AsyncActionStatus"
 import { ErrorState } from "../../components/ErrorState"
 import type { ManagementClient } from "../../../management-api/client"
+import { ActionButton, EmptyState, PageHeader, SectionCard, StatusBadge } from "../../components/FomoPrimitives"
 
 export interface ToolsPageProps {
   client: ManagementClient
@@ -15,8 +16,8 @@ export function ToolsPage({ client }: ToolsPageProps) {
 
   if (state.isLoading && state.instances.length === 0) {
     return (
-      <div className="p-8 flex items-center justify-center space-x-2 text-slate-500">
-        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-gray-900"></div>
+      <div className="flex items-center justify-center gap-2 p-8 text-slate-500">
+        <div className="h-4 w-4 animate-spin rounded-full border-b-2 border-slate-900" />
         <span>正在加载工具状态...</span>
       </div>
     )
@@ -27,57 +28,52 @@ export function ToolsPage({ client }: ToolsPageProps) {
 
   return (
     <div className="space-y-6 p-8">
-      <div className="flex items-center justify-between">
-        <div>
-          <p className="text-sm text-slate-500 mt-1">管理系统内嵌的各类开发辅助工具和服务</p>
-          <h1 className="text-2xl font-semibold text-slate-900">工具管理</h1>
-        </div>
-        <div className="flex items-center space-x-3">
+      <PageHeader
+        eyebrow="工具运行中心"
+        title="工具管理"
+        description="管理系统内嵌的各类开发辅助工具和服务。"
+        action={(
+          <>
           <AsyncActionStatus status={detectStatus} />
-          <button
+          <ActionButton
             onClick={() => state.detect()}
             disabled={detectStatus === "pending"}
-            className="flex items-center rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50 disabled:opacity-50"
+            tone="secondary"
           >
             <Search className="mr-2 h-4 w-4" />
             运行环境检测
-          </button>
-          <button
-            type="button"
+          </ActionButton>
+          <ActionButton
             onClick={() => state.detect()}
             disabled={detectStatus === "pending"}
-            className="flex items-center rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white shadow-sm transition-colors hover:bg-blue-700 disabled:opacity-50"
+            tone="primary"
           >
             <Plus className="mr-2 h-4 w-4" />
             安装新工具
-          </button>
-        </div>
-      </div>
+          </ActionButton>
+          </>
+        )}
+      />
 
       {detectError && <ErrorState error={detectError} onRetry={() => state.detect()} />}
 
-      <section aria-labelledby="detections-heading" className="bg-white p-4 rounded shadow border">
-        <h2 id="detections-heading" className="text-lg font-semibold mb-3">工具检测结果</h2>
+      <SectionCard title="工具检测结果" description="检测本机或服务器运行时中可用的 OpenCode、FRP 与辅助工具。">
+        <h2 id="detections-heading" className="sr-only">工具检测结果</h2>
         {state.detections.length === 0 ? (
-          <p className="text-sm text-gray-500 italic">点击“检测工具”后可查看当前运行时识别到的工具。</p>
+          <p className="text-sm text-slate-500">点击“运行环境检测”后可查看当前运行时识别到的工具。</p>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
             {state.detections.map((d) => (
               <DetectionCard key={d.kind} detection={d} state={state} />
             ))}
           </div>
         )}
-      </section>
+      </SectionCard>
 
-      <section aria-labelledby="instances-heading" className="bg-white p-4 rounded shadow border">
-        <h2 id="instances-heading" className="text-lg font-semibold mb-3">工具实例</h2>
+      <SectionCard title="工具实例" description="查看受管工具实例、进程状态、端口与配置目录。">
+        <h2 id="instances-heading" className="sr-only">工具实例</h2>
         {state.instances.length === 0 ? (
-          <div className="flex flex-col items-center justify-center space-y-4 rounded-xl border border-dashed border-slate-300 bg-slate-50 p-6 text-center text-gray-500">
-            <div className="flex h-12 w-12 items-center justify-center rounded-full bg-slate-100">
-              <Box className="h-6 w-6 text-slate-400" />
-            </div>
-            尚未发现可管理的工具实例。
-          </div>
+          <EmptyState icon={<Box className="h-6 w-6" />} title="尚未发现可管理的工具实例" description="运行环境检测后，如果发现 OpenCode、frpc 或 cloudflared，会在这里显示实例和操作入口。" />
         ) : (
           <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
             {state.instances.map((instance) => (
@@ -90,22 +86,23 @@ export function ToolsPage({ client }: ToolsPageProps) {
             ))}
           </div>
         )}
-      </section>
+      </SectionCard>
 
-      <section aria-labelledby="logs-heading" className="bg-white p-4 rounded shadow border">
-        <div className="flex items-center justify-between mb-3">
-          <h2 id="logs-heading" className="text-lg font-semibold">
-            运行日志：{state.selectedInstanceId ? state.instances.find((instance) => instance.id === state.selectedInstanceId)?.displayName || state.selectedInstanceId : "未选择实例"}
-          </h2>
-          <button
+      <SectionCard
+        title={`运行日志：${state.selectedInstanceId ? state.instances.find((instance) => instance.id === state.selectedInstanceId)?.displayName || state.selectedInstanceId : "未选择实例"}`}
+        description="选择工具实例后查看最近运行日志。"
+        action={(
+          <ActionButton
             onClick={() => state.refreshLogs()}
             disabled={!state.selectedInstanceId}
-            className="text-sm text-blue-600 hover:underline disabled:text-gray-400 disabled:no-underline"
+            tone="secondary"
           >
             刷新日志
-          </button>
-        </div>
-        <div className="h-64 bg-slate-900 text-slate-300 p-2 font-mono text-xs rounded overflow-y-auto">
+          </ActionButton>
+        )}
+      >
+        <h2 id="logs-heading" className="sr-only">运行日志</h2>
+        <div className="h-64 overflow-y-auto rounded-xl border border-slate-800 bg-slate-900 p-4 font-mono text-xs text-slate-300 shadow-inner">
           {!state.selectedInstanceId ? (
             <span className="italic opacity-50">请选择一个实例以查看运行日志。</span>
           ) : state.logs.length === 0 ? (
@@ -119,7 +116,7 @@ export function ToolsPage({ client }: ToolsPageProps) {
             ))
           )}
         </div>
-      </section>
+      </SectionCard>
     </div>
   )
 }
@@ -132,21 +129,19 @@ function DetectionCard({ detection, state }: { detection: ToolDetection, state: 
   const canInstallThisTool = !detection.detected && state.canInstallTools
 
   return (
-    <div className="p-3 border rounded bg-gray-50 flex flex-col justify-between">
+    <div className="flex flex-col justify-between rounded-lg border border-slate-200 bg-slate-50 p-4">
       <div>
         <div className="flex items-center justify-between mb-1">
-          <span className="font-medium">{detection.displayName}</span>
-          <span className={`text-xs px-2 py-0.5 rounded ${detection.detected ? "bg-green-100 text-green-700" : "bg-gray-200 text-gray-600"}`}>
-            {detection.detected ? "已检测" : "缺失"}
-          </span>
+          <span className="font-medium text-slate-800">{detection.displayName}</span>
+          <StatusBadge tone={detection.detected ? "success" : "neutral"}>{detection.detected ? "已检测" : "缺失"}</StatusBadge>
         </div>
-        {detection.version && <div className="text-xs text-gray-500">版本：{detection.version}</div>}
+        {detection.version && <div className="text-xs text-slate-500">版本：{detection.version}</div>}
       </div>
 
       {!detection.detected && (
         <div className="mt-3 border-t pt-3">
           {installError && <div className="mb-2"><ErrorState error={installError} /></div>}
-          <dl className="mb-3 space-y-1 text-xs text-gray-600">
+          <dl className="mb-3 space-y-1 text-xs text-slate-600">
             <div><dt className="inline font-semibold">安装类型：</dt> <dd className="inline">{detection.kind}</dd></div>
             <div><dt className="inline font-semibold">版本：</dt> <dd className="inline">{detection.version ?? "运行时默认"}</dd></div>
             <div><dt className="inline font-semibold">目标目录：</dt> <dd className="inline">{detection.configDirectory ?? "运行时管理"}</dd></div>
@@ -166,7 +161,7 @@ function DetectionCard({ detection, state }: { detection: ToolDetection, state: 
                     void state.install({ kind: detection.kind, version: detection.version, targetDirectory: detection.configDirectory })
                   }}
                   disabled={isInstalling}
-                  className="px-3 py-1 bg-green-600 text-white rounded text-sm hover:bg-green-700 disabled:opacity-50 flex items-center justify-center space-x-2"
+                  className="flex items-center justify-center gap-2 rounded-lg bg-emerald-500 px-3 py-1.5 text-sm font-medium text-white hover:bg-emerald-600 disabled:opacity-50"
                 >
                   {isInstalling && <div className="animate-spin h-3 w-3 border-b-2 border-white rounded-full"></div>}
                   <span>确认安装</span>
@@ -174,7 +169,7 @@ function DetectionCard({ detection, state }: { detection: ToolDetection, state: 
                 <button
                   onClick={() => setConfirmInstall(false)}
                   disabled={isInstalling}
-                  className="px-3 py-1 border border-gray-300 rounded text-sm bg-white hover:bg-gray-50 disabled:opacity-50"
+                  className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50"
                 >
                   取消
                 </button>
@@ -184,7 +179,7 @@ function DetectionCard({ detection, state }: { detection: ToolDetection, state: 
             <button
               onClick={() => setConfirmInstall(true)}
               disabled={isInstalling}
-              className="w-full px-3 py-1 bg-green-600 text-white rounded text-sm hover:bg-green-700 disabled:opacity-50 flex items-center justify-center space-x-2"
+              className="flex w-full items-center justify-center gap-2 rounded-lg bg-emerald-500 px-3 py-1.5 text-sm font-medium text-white hover:bg-emerald-600 disabled:opacity-50"
             >
               {isInstalling && <div className="animate-spin h-3 w-3 border-b-2 border-white rounded-full"></div>}
               <span>准备安装</span>
@@ -220,7 +215,7 @@ function ToolInstanceCard({ instance, state, isSelected }: { instance: ToolInsta
             <p className="mt-0.5 font-mono text-xs text-slate-500">{instance.id}</p>
           </div>
         </button>
-        <StatusBadge status={instance.status} />
+        <ToolStatusBadge status={instance.status} />
       </div>
 
       <dl className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs text-slate-500">
@@ -285,19 +280,21 @@ function ToolInstanceCard({ instance, state, isSelected }: { instance: ToolInsta
   )
 }
 
-function StatusBadge({ status }: { status: string }) {
-  const colors = {
-    running: "bg-green-100 text-green-700",
-    stopped: "bg-gray-200 text-gray-600",
-    error: "bg-red-100 text-red-700",
-    starting: "bg-blue-100 text-blue-700",
-  }[status] || "bg-gray-100 text-gray-600"
-
+function ToolStatusBadge({ status }: { status: string }) {
   return (
-    <span className={`text-[10px] uppercase font-bold px-1.5 py-0.5 rounded ${colors}`}>
+    <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${getStatusToneClass(status)}`}>
       {formatStatusLabel(status)}
     </span>
   )
+}
+
+function getStatusToneClass(status: string) {
+  return {
+    running: "bg-emerald-100 text-emerald-700",
+    stopped: "bg-slate-100 text-slate-600",
+    error: "bg-red-100 text-red-700",
+    starting: "bg-blue-100 text-blue-700",
+  }[status] || "bg-slate-100 text-slate-600"
 }
 
 function formatStatusLabel(status: string) {
